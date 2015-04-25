@@ -1,0 +1,12 @@
+{application, dxnn,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { dxnn_app, []}},
+  {env, []}
+ ]}.
