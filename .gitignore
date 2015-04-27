@@ -8,5 +8,8 @@ deps
 erl_crash.dump
 ebin
 rel/example_project
+Mnesia.*
+best
+experimental
 .concrete/DEV_MODE
 .rebar

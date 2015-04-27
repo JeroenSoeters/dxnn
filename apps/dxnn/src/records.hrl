@@ -1,5 +1,8 @@
--record(sensor, {id, cx_id, name, scape, vl, fanout_ids}).
--record(actuator, {id, cx_id, name, scape, vl, fanin_ids}).
--record(neuron, {id, cx_id, af, input_idps, output_ids}).
--record(cortex, {id, sensor_ids, actuator_ids, nids}).
-
+-record(sensor, {id, cortex_id, name, scape, vl, fanout_ids=[]}).
+-record(actuator, {id, cortex_id, name, scape, vl, fanin_ids=[]}).
+-record(neuron, {id, generation, cortex_id, af, input_ids_plus_weights=[], output_ids=[], recursive_output_ids=[]}).
+-record(cortex, {id, agent_id, neuron_ids=[], sensor_ids=[], actuator_ids=[]}).
+-record(agent, {id, generation, population_id, species_id, cortex_id, fingerprint, constraint, evo_hist=[], fitness, innovation_factor, pattern=[]}).
+-record(species, {id, population_id, fingerprint, constraint, agent_ids=[], champion_ids=[], avg_fitness, innovation_factor}).
+-record(population, {id, polis_id, species_ids=[], morphologies=[], innovation_factor}).
+-record(constraint, {morphology=[], neural_afs=[]}).

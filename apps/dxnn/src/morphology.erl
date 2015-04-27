@@ -2,22 +2,28 @@
 -compile(export_all).
 -include("records.hrl").
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Get Init Actuators/Sensors %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_InitSensor(Morphology)->
+%% ==================================================================
+%% Get actuators/sensors
+%% ==================================================================
+
+get_init_sensors(Morphology)->
 	Sensors = morphology:Morphology(sensors),
 	lists:nth(1, Sensors).
 
-get_InitActuator(Morphology)->
+get_init_actuators(Morphology)->
 	Actuators = morphology:Morphology(actuators),
 	lists:nth(1, Actuators).
 
-get_Sensors(Morphology)->
+get_sensors(Morphology)->
 	morphology:Morphology(sensors).
 
-get_Actuators(Morphology)->
+get_actuators(Morphology)->
 	morphology:Morphology(actuators).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% MORPHOLOGIES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ==================================================================
+%% Morphologies
+%% ==================================================================
+
 xor_mimic(sensors) ->
 	[
 		#sensor{id={sensor, generate_id()}, name=xor_GetInput, scape={private, xor_sim}, vl=2}
