@@ -413,11 +413,11 @@ construct(FileName, Morphology, HiddenLayerDensities) ->
 	create_NeuralInput([],Acc) ->
 		lists:reverse([{bias,random:uniform()-0.5}|Acc]).
 
-		create_NeuralWeights(0,Acc) ->
-			Acc;
-		create_NeuralWeights(Index,Acc) ->
-			W = random:uniform()-0.5,
-			create_NeuralWeights(Index-1,[W|Acc]).
+	create_NeuralWeights(0,Acc) ->
+		Acc;
+	create_NeuralWeights(Index,Acc) ->
+		W = random:uniform()-0.5,
+		create_NeuralWeights(Index-1,[W|Acc]).
 %Each neuron record is composed by the create_Neuron/4 function. The create_Neuron/4 function creates the Input list from the tuples [{Id,Weights}...] using the vector lengths specified in the place holder Input_IdPs. The create_NeuralInput/2 function then uses create_NeuralWeights/2 to generate the random weights in the range of -0.5 ro 0.5, adding the bias to the end of the list.
 
 	generate_unique_ids(N) ->
