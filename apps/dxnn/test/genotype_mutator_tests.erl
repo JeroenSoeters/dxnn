@@ -53,6 +53,20 @@ link_sensor_to_neuron_test() ->
 
 	teardown().
 
+link_neuron_to_actuator_test() ->
+	setup(),
+
+	create_link_between_elements(?B, ?ACTUATOR),
+
+	NeuronB = find_neuron(?B),
+	Actuator = find_actuator(?ACTUATOR),
+
+	io:format("~n B: ~p~n", [Actuator]),
+	?assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
+	?assert(lists:member(?B, Actuator#actuator.fanin_ids)),
+
+	teardown().
+
 create_link_between_elements(From, To) ->
 	F = fun() ->
 		genotype_mutator:create_link_between_elements(test, From, To)
@@ -64,6 +78,9 @@ find_neuron(NeuronId) ->
 
 find_sensor(SensorId) ->
 	find_node(sensor, SensorId).
+
+find_actuator(ActuatorId) -> 
+	find_node(actuator, ActuatorId).
 
 find_node(NodeType, NodeId) ->
 	F = fun() ->

@@ -10,7 +10,7 @@ create_link_between_elements(AgentId, FromElement, ToElement) ->
 		{{_FromId, sensor}, {_ToId, neuron}} ->
 			create_link_between_sensor_and_neuron(AgentId, FromElement, ToElement);
 		{{_FromId, neuron}, {_ToId, actuator}} ->
-			not_implemented
+			create_link_between_neuron_and_actuator(AgentId, FromElement, ToElement)
 	end.
 
 create_link_between_neurons(AgentId, FromId, ToId) ->
@@ -33,6 +33,16 @@ create_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
 	UpdatedNeuron = link_to_neuron(SensorId, Neuron, Sensor#sensor.vl, Generation),
 	genotype:write(UpdatedNeuron).
 
+create_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
+	Agent = genotype:read({agent, AgentId}),
+	Generation = Agent#agent.generation,
+	Actuator = genotype:read({actuator, ActuatorId}),
+	UpdatedActuator = link_to_actuator(Actuator, NeuronId),
+	genotype:write(UpdatedActuator),
+	Neuron = genotype:read({neuron, NeuronId}),
+	UpdatedNeuron = link_from_neuron(Neuron, ActuatorId, Generation),
+	genotype:write(UpdatedNeuron).
+
 link_from_sensor(Sensor, NeuronId) ->
 	FanoutIds = Sensor#sensor.fanout_ids,
 	case lists:member(NeuronId, FanoutIds) of
@@ -41,6 +51,16 @@ link_from_sensor(Sensor, NeuronId) ->
 				[NeuronId, Sensor#sensor.id]);
 		false ->
 			Sensor#sensor{fanout_ids = [NeuronId|FanoutIds]}
+	end.
+
+link_to_actuator(Actuator, NeuronId) ->
+	FaninIds = Actuator#actuator.fanin_ids,
+	case lists:member(NeuronId, FaninIds) of
+		true ->
+			exit("******** ERROR: link_to_actuator cannot add ~p to fanin of ~p as it is already connected",
+				[NeuronId, Actuator#actuator.id]);
+		false ->
+			Actuator#actuator{fanin_ids = [NeuronId|FaninIds]}
 	end.
 
 link_from_neuron(FromNeuron, ToId, Generation) ->
