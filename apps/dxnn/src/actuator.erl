@@ -28,7 +28,7 @@ pts(Result) ->
 	io:format("actuator:pts(Result):~p~n", [Result]).
 %The pts actuation function simply prints to the screen the vector passed to it.
 
-xor_SendOutput(Output, Scape) ->
+xor_send_output(Output, Scape) ->
 	Scape ! {self(), action,  Output},
 	receive
 		{Scape, Fitness, HaltFlag} ->

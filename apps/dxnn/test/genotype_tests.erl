@@ -2,23 +2,24 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/records.hrl").
 
-genotype_test_xxx() ->
+construct_and_clone_test() ->
 	polis:start(),
-	
-	SpecieId = test,
-	AgentId = test,
-	ClonedAgentId = test_clone,
-	SpeciesConstraint = #constraint{},
-	%mnesia:transaction(fun() ->
-	%	genotype:construct_agent(SpecieId, AgentId, SpeciesConstraint),
-	%	genotype:clone_agent(genotype:clone_agent) end),
-
+	F = fun() ->
+		AgentId = test,
+		CloneId = test_clone,
+		construct_and_clone_agent(AgentId, CloneId),
+		Agent = genotype:read({agent, AgentId}),
+		Clone = genotype:read({agent, CloneId}),
+		cleanup_agents(AgentId, CloneId),
+		?assert(Agent#agent.fingerprint == Clone#agent.fingerprint)
+	end,
 	polis:stop().
 
-create_agent_test_xxx() ->
-	%AgentId = test,
-	%genotype:construct_agent(SpecieId, AgentId, SpeciesConstraint),
-	%{Agent, Cortex} = genotype:read_agent(AgentId),
-	?assert(stuff_on_agent),
-	?assert(stuff_on_cortex),
-	?assert(true).
+construct_and_clone_agent(AgentId, CloneId) ->
+	SpeciesConstraint = #constraint{},
+	genotype:construct_agent(AgentId, test, SpeciesConstraint),
+	genotype:clone_agent(AgentId, CloneId).
+
+cleanup_agents(AgentId, CloneId) ->
+	genotype:delete_agent(AgentId),
+	genotype:delete_agent(CloneId).

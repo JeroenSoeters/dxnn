@@ -31,7 +31,7 @@ rng1(VL, Acc) ->
 	rng(VL-1, [random:uniform()|Acc]).
 %'rng' is a simple random number generator that produces a vector of random values, each between 0 and 1. The length of the vector is defined by the VL, which itself is specified within the sensor record.
 
-xor_GetInput(VL, Scape) ->
+xor_get_input(VL, Scape) ->
 	Scape ! {self(), sense},
 	receive
 		{Scape, percept, SensoryVector} ->

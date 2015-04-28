@@ -4,21 +4,20 @@
 
 %% doc The population montitor should have all the information with regards to the morphologies and species constraints under which the agent's genotype should be created. Thus construct_agent/3 is ran with the parameter SpeciesId to which this NN based system will belong, the AgentId that this NN based intelligent agent will have and the SpeciesConstraint that will define the list of activation functions and other parameters from which the seed agent can choose its parameters. In this function, first the generation is set to 0, since the agent is just created, then construct_cortex/3 is invoked, which creates the NN and returns itss CortexId. Ince the NN is created and the cortex's id is returned, we can fill out the information needed by the agent record and write it to the mnesia database.
 construct_agent(SpeciesId, AgentId, SpeciesConstraint) ->
-	random:seed(now),
+	random:seed(now()),
 	Generation = 0,
 	{CortexId, Pattern} = construct_cortex(AgentId, Generation, SpeciesConstraint),
-	FingerPrint = create_fingerprint(AgentId),
 	Agent = #agent{
 		id = AgentId,
 		cortex_id = CortexId,
 		species_id = SpeciesId,
-		fingerprint = FingerPrint,
 		constraint = SpeciesConstraint,
 		generation = Generation,
 		pattern = Pattern,
 		evo_hist = []
 	},
-	write(Agent).	 
+	write(Agent),
+	update_fingerprint(AgentId).	 
 	 
 %% doc Generates a new CortexId, extracts tje morphology form the constraints record passed to it in SpeciesConstraints and then extracts the initial sensors and actuators from the morphology. After the sensors and actuators are extracted, the function calls construct_initial_neuro_layer/5, which creates a single layer of neurons connected from the specified sensors and to the specified actuators and then returns the ids of the created neurons. Finally the sensor and actuator ids are extracted and the cortex record is composed and written to the database.
 construct_cortex(AgentId, Generation, SpeciesConstraint) ->
@@ -135,7 +134,7 @@ calculate_recursive_output_ids(_SelfId, [], Acc) ->
 	lists:reverse(Acc).
 
 %% doc calculates the fingerprint of the agent, where the fingerprint is just a tuple of the various general features of the NN based system, a list of features that play some role in distinguishing it's genotype's general properties from those of other NN systems, Here, the fingerprint is composed of the generalized pattern (pattern minus the unique ids), the generalized evolution history (evolutionary history minis the unique ids of the elements), a generalized sensor set and a generalized actuator set of the agent in question.
-create_fingerprint(AgentId) ->
+update_fingerprint(AgentId) ->
 	Agent = read({agent, AgentId}),
 	Cortex = read({cortex, Agent#agent.cortex_id}),
 	GeneralizedSensors = [(read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined} 
@@ -145,7 +144,8 @@ create_fingerprint(AgentId) ->
 	GeneralizedPattern = [{LayerIndex, length(LayerNeuronIds)} 
 		|| {LayerIndex, LayerNeuronIds} <- Agent#agent.pattern],
 	GeneralizedEvolutionaryHistory = generalize_evolutionary_history(Agent#agent.evo_hist),
-	{GeneralizedPattern, GeneralizedEvolutionaryHistory, GeneralizedSensors, GeneralizedActuators}.
+	Fingerprint = {GeneralizedPattern, GeneralizedEvolutionaryHistory, GeneralizedSensors, GeneralizedActuators},
+	write(Agent#agent{fingerprint = Fingerprint}).
 
 %% doc generalizes the evolutionary history tuples by removing the unique element ids. Two neurons which are using exactly the same activation function, located in exactly the same layer and using exactly the same synaptic weights, will still have different unique ids. Thus these ids must be removed to produce a more general set of tuples. There are 3 types of tuples in the list, which 3, 2 and 1 element ids. The generalized history is returned to the caller.
 generalize_evolutionary_history(History) ->
@@ -189,7 +189,7 @@ delete_agent(AgentId) ->
 	Cortex = read({cortex, Agent#agent.cortex_id}),
 	[delete(sensor, Id) || Id  <- Cortex#cortex.sensor_ids],
 	[delete(neuron, Id) || Id  <- Cortex#cortex.neuron_ids],
-	[delete(sactuator, Id) || Id  <- Cortex#cortex.actuator_ids],
+	[delete(actuator, Id) || Id  <- Cortex#cortex.actuator_ids],
 	delete(cortex, Agent#agent.cortex_id),
 	delete(agent, AgentId).
 
@@ -310,11 +310,11 @@ read_nn(AgentId) ->
 	{Agent, Cortex, Sensors, Neurons, Actuators}.
 
 %% doc reads the key from the given mnesia table
-read({TableAndKey}) ->
-	case mnesia:read({TableAndKey}) of
+read(TableAndKey) ->
+	case mnesia:read(TableAndKey) of
 		[] ->
 			undefined;
-		Record ->
+		[Record] ->
 			Record
 	end.
 
@@ -339,8 +339,8 @@ construct(Morphology, HiddenLayerDensities) ->
 construct(FileName, Morphology, HiddenLayerDensities) ->
 	{V1, V2, V3} = now(),
 	random:seed(V1, V2, V3),
-	S = morphology:get_init_sensors(Morphology),
-	A = morphology:get_init_actuators(Morphology),
+	[S] = morphology:get_init_sensors(Morphology),
+	[A] = morphology:get_init_actuators(Morphology),
 	Output_VL = A#actuator.vl,
 	LayerDensities = lists:append(HiddenLayerDensities,[Output_VL]),
 	Cx_Id = cortex,
