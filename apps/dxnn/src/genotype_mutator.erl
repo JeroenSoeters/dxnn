@@ -117,11 +117,23 @@ cut_link_between_neurons(AgentId, FromNeuronId, ToNeuronId) ->
 	UpdatedToNeuron = cut_link_to_neuron(ToNeuron, FromNeuronId, Generation),
 	genotype:write(UpdatedToNeuron).
 
-cut_link_between_sensor_and_neuron(AgentId, FromElement, ToElement) ->
-	not_implemented.
+cut_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
+	Generation = get_generation(AgentId),
+	Sensor = genotype:read({sensor, SensorId}),
+	UpdatedSensor = cut_link_from_sensor(Sensor, NeuronId),
+	genotype:write(UpdatedSensor),
+	Neuron = genotype:read({neuron, NeuronId}),
+	UpdatedNeuron = cut_link_to_neuron(Neuron, SensorId, Generation),
+	genotype:write(UpdatedNeuron).
 
-cut_link_between_neuron_and_actuator(AgentId, FromElement, ToElement) ->
-	not_implemented.
+cut_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
+	Generation = get_generation(AgentId),
+	Actuator = genotype:read({actuator, ActuatorId}),
+	UpdatedActuator = cut_link_to_actuator(Actuator, NeuronId),
+	genotype:write(UpdatedActuator),
+	Neuron = genotype:read({neuron, NeuronId}),
+	UpdatedNeuron = cut_link_from_neuron(Neuron, ActuatorId, Generation),
+	genotype:write(UpdatedNeuron).
 
 cut_link_from_neuron(FromNeuron, ToNeuronId, Generation) ->
 	OutputIds = FromNeuron#neuron.output_ids,
@@ -154,6 +166,26 @@ cut_link_to_neuron(ToNeuron, FromNeuronId, Generation) ->
 		false ->
 			exit("******** ERROR: cut_link_to_neuron cannot remove ~p from input of ~p as it is not connected",
 				[FromNeuronId, ToNeuron#neuron.id])
+	end.
+
+cut_link_from_sensor(Sensor, NeuronId) ->
+	FanoutIds = Sensor#sensor.fanout_ids,
+	case lists:member(NeuronId, FanoutIds) of
+		true ->
+			Sensor#sensor{fanout_ids = FanoutIds -- [NeuronId]};
+		false ->
+			exit("******** ERROR: cut_link_from_sensor cannot remove ~p from fanout of ~p as it is not connected",
+				[NeuronId, Sensor#sensor.id])
+	end.
+
+cut_link_to_actuator(Actuator, NeuronId) ->
+	FaninIds = Actuator#actuator.fanin_ids,
+	case lists:member(NeuronId, FaninIds) of
+		true ->
+			Actuator#actuator{fanin_ids = FaninIds -- [NeuronId]};
+		false ->
+			exit("******** ERROR: cut_link_to_actuator cannot remove ~p from fanin of ~p as it is not connected",
+				[NeuronId, Actuator#actuator.id])
 	end.
 %% cut_link_from_sensor, cut_link_from_neuron, cut_link_to_neuron, cut_link_to_actuator
 

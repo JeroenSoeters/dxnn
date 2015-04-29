@@ -84,6 +84,32 @@ cut_link_between_neurons_test() ->
 
 	teardown().
 
+cut_link_between_sensor_and_neuron_test() ->
+	setup(),
+
+	cut_link_between_elements(?SENSOR, ?A),
+	
+	Sensor = find_sensor(?SENSOR),
+	NeuronA = find_neuron(?A),
+
+	?assert(not lists:member(?A, Sensor#sensor.fanout_ids)),
+	?assert(not lists:keymember(?SENSOR, 1, NeuronA#neuron.input_ids_plus_weights)),
+
+	teardown().
+
+cut_link_between_neuron_and_actuator_test() ->
+	setup(),
+
+	cut_link_between_elements(?D, ?ACTUATOR),
+	
+	NeuronD = find_neuron(?D),
+	Actuator = find_actuator(?ACTUATOR),
+
+	?assert(not lists:member(?ACTUATOR, NeuronD#neuron.output_ids)),
+	?assert(not lists:member(?D, Actuator#actuator.fanin_ids)),
+
+	teardown().
+
 create_link_between_elements(From, To) ->
 	F = fun() ->
 		genotype_mutator:create_link_between_elements(test, From, To)
@@ -195,4 +221,4 @@ create_test_genotype() ->
 		name = xor_send_output,
 		scape = {private,xor_sim},
 		vl =1,
-		fanin_ids = [?C]}].
+		fanin_ids = [?D]}].
