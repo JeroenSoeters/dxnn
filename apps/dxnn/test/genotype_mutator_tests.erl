@@ -9,24 +9,25 @@
 -define(C, {{0, 60}, neuron}).
 -define(D, {{0.5, 70}, neuron}).
 
+%% ===================================================================
+%% Setup and teardown
+%% ===================================================================
+
 setup() ->
 	polis:start(),
 	F = fun() ->
-		[mnesia:write(R) || R <- create_test_genotype()],
-		genotype_mutator:create_link_between_elements(test, ?A, ?B)
+		[mnesia:write(R) || R <- create_test_genotype()]
 	end,
 	mnesia:transaction(F).
 
 teardown() ->
 	polis:stop().
 
-link_elements_test_ignore() ->
-	{foreach,
-	 fun() -> setup() end,
-	 fun() -> polist:stop() end,
-	 [fun() -> link_neuron_to_neuron_test() end]}.
+%% ===================================================================
+%% Creating links
+%% ===================================================================
 
-link_neuron_to_neuron_test() ->
+create_link_between_neurons_test() ->
 	setup(),
 
 	create_link_between_elements(?A, ?B),
@@ -40,7 +41,7 @@ link_neuron_to_neuron_test() ->
 
 	teardown().
 
-link_sensor_to_neuron_test() ->
+create_link_betweem_sensor_and_neuron_test() ->
 	setup(),
 
     create_link_between_elements(?SENSOR, ?C),
@@ -53,7 +54,7 @@ link_sensor_to_neuron_test() ->
 
 	teardown().
 
-link_neuron_to_actuator_test() ->
+create_link_between_neuron_and_actuator_test() ->
 	setup(),
 
 	create_link_between_elements(?B, ?ACTUATOR),
@@ -61,9 +62,25 @@ link_neuron_to_actuator_test() ->
 	NeuronB = find_neuron(?B),
 	Actuator = find_actuator(?ACTUATOR),
 
-	io:format("~n B: ~p~n", [Actuator]),
 	?assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
 	?assert(lists:member(?B, Actuator#actuator.fanin_ids)),
+
+	teardown().
+
+%% ===================================================================
+%% Cutting links
+%% ===================================================================
+
+cut_link_between_neurons_test() ->
+	setup(),
+
+	cut_link_between_elements(?A, ?C),
+
+	NeuronA = find_neuron(?A),
+	NeuronC = find_neuron(?C),
+
+	?assert(not lists:member(?C, NeuronA#neuron.output_ids)),
+	?assert(not lists:keymember(?A, 1, NeuronC#neuron.input_ids_plus_weights)),	
 
 	teardown().
 
@@ -71,7 +88,13 @@ create_link_between_elements(From, To) ->
 	F = fun() ->
 		genotype_mutator:create_link_between_elements(test, From, To)
 	end,
-	mnesia:transaction(F).
+	{atomic, _} = mnesia:transaction(F).
+
+cut_link_between_elements(From, To) ->
+	F = fun() ->
+		genotype_mutator:cut_link_between_elements(test, From, To)
+	end,
+	{atomic, _} = mnesia:transaction(F).
 
 find_neuron(NeuronId) ->
 	find_node(neuron, NeuronId).
@@ -153,8 +176,8 @@ create_test_genotype() ->
 		cortex_id = {{origin,10},cortex},
 		af = gauss,
 		input_ids_plus_weights = [
-			{{{-1,40},neuron}, [0.43873748179197447,-0.17357135008390578]},  
-			{{{-1,50},neuron}, [0.43873748179197447,-0.17357135008390578]}],
+			{?A, [0.43873748179197447,-0.17357135008390578]},  
+			{?B, [0.43873748179197447,-0.17357135008390578]}],
 		output_ids = [?D],
 		recursive_output_ids = []},
 	#neuron{ % neuron D
@@ -163,7 +186,7 @@ create_test_genotype() ->
 		cortex_id = {{origin,10},cortex},
 		af = gauss,
 		input_ids_plus_weights = [
-			{{{0.5,60},neuron}, [0.43873748179197447,-0.17357135008390578]}],
+			{?C, [0.43873748179197447,-0.17357135008390578]}],
 		output_ids = [?ACTUATOR],
 		recursive_output_ids = []},
 	 #actuator{

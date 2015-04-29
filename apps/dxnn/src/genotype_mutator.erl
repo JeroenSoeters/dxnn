@@ -14,8 +14,7 @@ create_link_between_elements(AgentId, FromElement, ToElement) ->
 	end.
 
 create_link_between_neurons(AgentId, FromId, ToId) ->
-	Agent = genotype:read({agent, AgentId}),
-	Generation = Agent#agent.generation,
+	Generation = get_generation(AgentId),
 	FromNeuron = genotype:read({neuron, FromId}),
  	UpdatedFromNeuron = link_from_neuron(FromNeuron, ToId, Generation),
 	genotype:write(UpdatedFromNeuron),
@@ -24,8 +23,7 @@ create_link_between_neurons(AgentId, FromId, ToId) ->
 	genotype:write(UpdatedToNeuron).
 
 create_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
-	Agent = genotype:read({agent, AgentId}),
-	Generation = Agent#agent.generation,
+	Generation = get_generation(AgentId),
 	Sensor = genotype:read({sensor, SensorId}),
 	UpdatedSensor = link_from_sensor(Sensor, NeuronId),
 	genotype:write(UpdatedSensor),
@@ -34,8 +32,7 @@ create_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
 	genotype:write(UpdatedNeuron).
 
 create_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
-	Agent = genotype:read({agent, AgentId}),
-	Generation = Agent#agent.generation,
+	Generation = get_generation(AgentId),
 	Actuator = genotype:read({actuator, ActuatorId}),
 	UpdatedActuator = link_to_actuator(Actuator, NeuronId),
 	genotype:write(UpdatedActuator),
@@ -101,8 +98,65 @@ link_to_neuron(FromNeuronId, ToNeuron, VectorLength, Generation) ->
 			}
 	end.
 
-cut_link_between_elements() ->
+cut_link_between_elements(AgentId, FromElement, ToElement) ->
+	case {FromElement, ToElement} of
+		{{_FromId, neuron}, {_ToId, neuron}} ->
+			cut_link_between_neurons(AgentId, FromElement, ToElement);
+		{{_FromId, sensor}, {_ToId, neuron}} ->
+			cut_link_between_sensor_and_neuron(AgentId, FromElement, ToElement);
+		{{_FromId, neuron}, {_ToId, actuator}} ->
+			cut_link_between_neuron_and_actuator(AgentId, FromElement, ToElement)
+	end.
+
+cut_link_between_neurons(AgentId, FromNeuronId, ToNeuronId) ->
+	Generation = get_generation(AgentId),
+	FromNeuron = genotype:read({neuron, FromNeuronId}),
+	UpdatedFromNeuron = cut_link_from_neuron(FromNeuron, ToNeuronId, Generation),
+	genotype:write(UpdatedFromNeuron),
+	ToNeuron = genotype:read({neuron, ToNeuronId}),
+	UpdatedToNeuron = cut_link_to_neuron(ToNeuron, FromNeuronId, Generation),
+	genotype:write(UpdatedToNeuron).
+
+cut_link_between_sensor_and_neuron(AgentId, FromElement, ToElement) ->
 	not_implemented.
 
+cut_link_between_neuron_and_actuator(AgentId, FromElement, ToElement) ->
+	not_implemented.
 
+cut_link_from_neuron(FromNeuron, ToNeuronId, Generation) ->
+	OutputIds = FromNeuron#neuron.output_ids,
+	RecursiveOutputIds = FromNeuron#neuron.recursive_output_ids,
+	case lists:member(ToNeuronId, OutputIds) of
+		true ->
+			UpdatedOutputIds = OutputIds -- [ToNeuronId],
+			UpdatedRecursiveOutputIds = RecursiveOutputIds -- [ToNeuronId],
+			U = FromNeuron#neuron{
+				output_ids = UpdatedOutputIds,
+				recursive_output_ids = UpdatedRecursiveOutputIds,
+				generation = Generation
+			},
+			U;
+		false ->
+			exit("******** ERROR: cut_link_from_neuron cannot remove ~p from output of ~p as it is not connected",
+				[ToNeuronId, FromNeuron#neuron.id])
+	end.
 
+cut_link_to_neuron(ToNeuron, FromNeuronId, Generation) ->
+	InputIdsPlusWeights = ToNeuron#neuron.input_ids_plus_weights,
+	io:format("cutting link to neuron. from id: ~p~n idps: ~p~n", [FromNeuronId, InputIdsPlusWeights]),
+	case lists:keymember(FromNeuronId, 1, InputIdsPlusWeights) of
+		true ->
+			UpdatedInputIdsPlusWeights = lists:keydelete(FromNeuronId, 1, InputIdsPlusWeights),
+			ToNeuron#neuron{
+				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
+				generation = Generation
+			};
+		false ->
+			exit("******** ERROR: cut_link_to_neuron cannot remove ~p from input of ~p as it is not connected",
+				[FromNeuronId, ToNeuron#neuron.id])
+	end.
+%% cut_link_from_sensor, cut_link_from_neuron, cut_link_to_neuron, cut_link_to_actuator
+
+get_generation(AgentId) ->
+	Agent = genotype:read({agent, AgentId}),
+	Agent#agent.generation.
