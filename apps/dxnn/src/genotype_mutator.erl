@@ -104,7 +104,11 @@ mutate_af(AgentId, RandomInt) ->
 		af = genotype:generate_activation_function(ActivationFunctions, RandomInt),
 		generation = Generation
 	},
-	genotype:write(UpdatedNeuron).
+	UpdatedAgent = Agent#agent{
+		evo_hist = [{mutate_af, Neuron#neuron.id}|Agent#agent.evo_hist]
+	},
+	genotype:write(UpdatedNeuron),
+	genotype:write(UpdatedAgent).
 
 select_random_neuron(Agent, RandomInt) ->
 	CortexId = Agent#agent.cortex_id,

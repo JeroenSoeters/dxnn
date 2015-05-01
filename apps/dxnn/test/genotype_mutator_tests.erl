@@ -96,9 +96,11 @@ mutate_af_test() ->
 	mutate_af(fun(_) -> 2 end),
 
 	NeuronB = find_neuron(?B),
-	%Agent = find_agent(?AGENT),	
+	Agent = find_agent(?AGENT),	
+	[LastMutation|_] = Agent#agent.evo_hist,
 	
 	?assertEqual(cos, NeuronB#neuron.af),	
+	?assertEqual({mutate_af, ?B}, LastMutation),
 
 	teardown().
 
