@@ -46,7 +46,7 @@ mutate_weights_test() ->
 	?assert(lists:nth(2, NeuronC#neuron.input_ids_plus_weights) =/= 
 		lists:nth(2, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),
 	
-	?assert(LastMutation == {mutate_weights, ?C}),	
+	?assertEqual({mutate_weights, ?C}, LastMutation),	
 
 	teardown().
 
