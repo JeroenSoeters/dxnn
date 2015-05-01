@@ -10,18 +10,13 @@
 %% ===================================================================
 
 mutate_weights(AgentId, Randomizer) ->
-	{_RandomFloat, RandomInt} = Randomizer,
 	Agent = genotype:read({agent, AgentId}),
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	NeuronIds = Cortex#cortex.neuron_ids,
-	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
-	Neuron = genotype:read({neuron, NeuronId}),
+	Neuron = select_random_neuron(Agent, Randomizer),
 	UpdatedNeuron = Neuron#neuron{
 		input_ids_plus_weights = perturb_ids_plus_weights(Neuron#neuron.input_ids_plus_weights, Randomizer)
 	},
 	UpdatedAgent = Agent#agent{
-		evo_hist = [{mutate_weights, NeuronId}|Agent#agent.evo_hist]
+		evo_hist = [{mutate_weights, Neuron#neuron.id}|Agent#agent.evo_hist]
 	},
 	genotype:write(UpdatedNeuron),
 	genotype:write(UpdatedAgent).
@@ -55,18 +50,14 @@ sat(Val, Min, Max) ->
 	end.
 
 add_bias(AgentId, Randomizer) ->
-	{RandomFloat, RandomInt} = Randomizer,
+	{RandomFloat, _RandomInt} = Randomizer,
 	Agent = genotype:read({agent, AgentId}),
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	NeuronIds = Cortex#cortex.neuron_ids,
-	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
 	Generation = Agent#agent.generation,
-	Neuron = genotype:read({neuron, NeuronId}),
+	Neuron = select_random_neuron(Agent, Randomizer),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		true ->
 			exit("******** ERROR: add_bias cannot add bias to neuron ~p as it is already has a bias",
-				[NeuronId]);
+				[Neuron#neuron.id]);
 		false ->
 			InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
 			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, RandomFloat()-0.5}]),
@@ -74,10 +65,38 @@ add_bias(AgentId, Randomizer) ->
 				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
 				generation = Generation
 			},
-			genotype:write(UpdatedNeuron)
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_bias, Neuron#neuron.id}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedNeuron),
+			genotype:write(UpdatedAgent)
 	end.
 			
+remove_bias(AgentId, Randomizer) ->
+	{_RandomFloat, RandomInt} = Randomizer,
+	Agent = genotype:read({agent, AgentId}),
+	Generation = Agent#agent.generation,
+	Neuron = select_random_neuron(Agent, Randomizer),
+	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
+		false ->
+			exit("******** ERROR: add_bias cannot remove bias from neuron ~p as it is doesn't has a bias",
+				[Neuron#neuron.id]);
+		true ->
+			UpdatedInputIdsPlusWeights = lists:keydelete(bias, 1, Neuron#neuron.input_ids_plus_weights),
+			UpdatedNeuron = Neuron#neuron{
+				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
+				generation = generation
+			},
+			genotype:write(UpdatedNeuron)
+	end.
+		
 
+select_random_neuron(Agent, {_RandomFloat, RandomInt}) ->
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	NeuronIds = Cortex#cortex.neuron_ids,
+	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
+	genotype:read({neuron, NeuronId}).
 
 %% possible optimizations:
 %% get_random_neuron(AgentId)

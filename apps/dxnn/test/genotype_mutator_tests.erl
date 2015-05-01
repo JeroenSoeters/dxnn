@@ -51,10 +51,7 @@ mutate_weights_test() ->
 	teardown().
 
 mutate_weights(Randomizer) ->
-	F = fun() ->
-		genotype_mutator:mutate_weights(?AGENT, Randomizer)
-	end,
-	{atomic, _} = mnesia:transaction(F).
+	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT, Randomizer) end).
 
 add_bias_test() ->
 	setup(),
@@ -62,16 +59,30 @@ add_bias_test() ->
 	add_bias({fun() -> 0.9 end, fun(4) -> 1 end}),
 
 	NeuronA = find_neuron(?A),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
 
 	?assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
+	?assertEqual({add_bias, ?A}, LastMutation),
 
 	teardown().
 
 add_bias(Randomizer) ->
-	F = fun() ->
-		genotype_mutator:add_bias(?AGENT, Randomizer)
-	end,
-	{atomic, _} = mnesia:transaction(F).
+	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT, Randomizer) end).
+
+remove_bias_test() ->
+	setup(),
+	
+	remove_bias({whatever, fun(4) -> 4 end}),
+
+	NeuronD = find_neuron(?D),
+
+	?assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
+
+	teardown().
+
+remove_bias(Randomizer) ->
+	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT, Randomizer) end).
 
 %% ===================================================================
 %% Creating links
@@ -161,16 +172,10 @@ cut_link_between_neuron_and_actuator_test() ->
 	teardown().
 
 create_link_between_elements(From, To) ->
-	F = fun() ->
-		genotype_mutator:create_link_between_elements(?AGENT, From, To)
-	end,
-	{atomic, _} = mnesia:transaction(F).
+	in_transaction(fun() -> genotype_mutator:create_link_between_elements(?AGENT, From, To) end).
 
 cut_link_between_elements(From, To) ->
-	F = fun() ->
-		genotype_mutator:cut_link_between_elements(?AGENT, From, To)
-	end,
-	{atomic, _} = mnesia:transaction(F).
+	in_transaction(fun() ->	genotype_mutator:cut_link_between_elements(?AGENT, From, To) end).
 
 find_neuron(NeuronId) ->
 	find_node(neuron, NeuronId).
@@ -190,6 +195,9 @@ find_node(NodeType, NodeId) ->
 	end,
 	{atomic, Node} = mnesia:transaction(F),
 	Node.
+
+in_transaction(Action) ->
+	{atomic, _} = mnesia:transaction(Action).
 
 %%      A  
 %%    /   \
