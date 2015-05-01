@@ -76,8 +76,11 @@ remove_bias_test() ->
 	remove_bias({whatever, fun(4) -> 4 end}),
 
 	NeuronD = find_neuron(?D),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
 
 	?assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
+	?assertEqual({remove_bias, ?D}, LastMutation),
 
 	teardown().
 

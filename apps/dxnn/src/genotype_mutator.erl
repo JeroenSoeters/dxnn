@@ -87,7 +87,11 @@ remove_bias(AgentId, Randomizer) ->
 				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
 				generation = generation
 			},
-			genotype:write(UpdatedNeuron)
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{remove_bias, Neuron#neuron.id}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedNeuron),
+			genotype:write(UpdatedAgent)
 	end.
 		
 
