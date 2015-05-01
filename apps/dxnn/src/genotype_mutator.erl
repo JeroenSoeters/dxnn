@@ -11,7 +11,8 @@
 
 mutate_weights(AgentId, Randomizer) ->
 	Agent = genotype:read({agent, AgentId}),
-	Neuron = select_random_neuron(Agent, Randomizer),
+	{_RandomFloat, RandomInt} = Randomizer,
+	Neuron = select_random_neuron(Agent, RandomInt),
 	UpdatedNeuron = Neuron#neuron{
 		input_ids_plus_weights = perturb_ids_plus_weights(Neuron#neuron.input_ids_plus_weights, Randomizer)
 	},
@@ -50,10 +51,10 @@ sat(Val, Min, Max) ->
 	end.
 
 add_bias(AgentId, Randomizer) ->
-	{RandomFloat, _RandomInt} = Randomizer,
+	{RandomFloat, RandomInt} = Randomizer,
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
-	Neuron = select_random_neuron(Agent, Randomizer),
+	Neuron = select_random_neuron(Agent, RandomInt),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		true ->
 			exit("******** ERROR: add_bias cannot add bias to neuron ~p as it is already has a bias",
@@ -76,7 +77,7 @@ remove_bias(AgentId, Randomizer) ->
 	{_RandomFloat, RandomInt} = Randomizer,
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
-	Neuron = select_random_neuron(Agent, Randomizer),
+	Neuron = select_random_neuron(Agent, RandomInt),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		false ->
 			exit("******** ERROR: add_bias cannot remove bias from neuron ~p as it is doesn't has a bias",
@@ -85,7 +86,7 @@ remove_bias(AgentId, Randomizer) ->
 			UpdatedInputIdsPlusWeights = lists:keydelete(bias, 1, Neuron#neuron.input_ids_plus_weights),
 			UpdatedNeuron = Neuron#neuron{
 				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
-				generation = generation
+				generation = Generation
 			},
 			UpdatedAgent = Agent#agent{
 				evo_hist = [{remove_bias, Neuron#neuron.id}|Agent#agent.evo_hist]
@@ -94,8 +95,18 @@ remove_bias(AgentId, Randomizer) ->
 			genotype:write(UpdatedAgent)
 	end.
 		
+mutate_af(AgentId, RandomInt) ->
+	Agent = genotype:read({agent, AgentId}),
+	Generation = Agent#agent.generation,
+	Neuron = select_random_neuron(Agent, RandomInt),
+	ActivationFunctions = (Agent#agent.constraint)#constraint.neural_afs -- [Neuron#neuron.af],
+	UpdatedNeuron = Neuron#neuron{
+		af = genotype:generate_activation_function(ActivationFunctions, RandomInt),
+		generation = Generation
+	},
+	genotype:write(UpdatedNeuron).
 
-select_random_neuron(Agent, {_RandomFloat, RandomInt}) ->
+select_random_neuron(Agent, RandomInt) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
 	NeuronIds = Cortex#cortex.neuron_ids,

@@ -87,6 +87,24 @@ remove_bias_test() ->
 remove_bias(Randomizer) ->
 	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT, Randomizer) end).
 
+mutate_af_test() ->
+	setup(),
+
+	% As we have 4 neurons so far and 4-1 = 3 neural afs to choose from we mock RandomInt to 
+	% return 2 which results in changing the AF of neuron b to cos (as defined in records.hrl)
+	% this test breaks as we add more activation functions in records.hrl.
+	mutate_af(fun(_) -> 2 end),
+
+	NeuronB = find_neuron(?B),
+	%Agent = find_agent(?AGENT),	
+	
+	?assertEqual(cos, NeuronB#neuron.af),	
+
+	teardown().
+
+mutate_af(RandomInt) ->
+	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT, RandomInt) end).
+
 %% ===================================================================
 %% Creating links
 %% ===================================================================

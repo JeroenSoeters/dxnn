@@ -3,10 +3,10 @@
 -include("records.hrl").
 
 %% doc The population montitor should have all the information with regards to the morphologies and species constraints under which the agent's genotype should be created. Thus construct_agent/3 is ran with the parameter SpeciesId to which this NN based system will belong, the AgentId that this NN based intelligent agent will have and the SpeciesConstraint that will define the list of activation functions and other parameters from which the seed agent can choose its parameters. In this function, first the generation is set to 0, since the agent is just created, then construct_cortex/3 is invoked, which creates the NN and returns itss CortexId. Ince the NN is created and the cortex's id is returned, we can fill out the information needed by the agent record and write it to the mnesia database.
-construct_agent(SpeciesId, AgentId, SpeciesConstraint) ->
+construct_agent(SpeciesId, AgentId, SpeciesConstraint, RandomInt) ->
 	random:seed(now()),
 	Generation = 0,
-	{CortexId, Pattern} = construct_cortex(AgentId, Generation, SpeciesConstraint),
+	{CortexId, Pattern} = construct_cortex(AgentId, Generation, SpeciesConstraint, RandomInt),
 	Agent = #agent{
 		id = AgentId,
 		cortex_id = CortexId,
@@ -20,7 +20,7 @@ construct_agent(SpeciesId, AgentId, SpeciesConstraint) ->
 	update_fingerprint(AgentId).	 
 	 
 %% doc Generates a new CortexId, extracts tje morphology form the constraints record passed to it in SpeciesConstraints and then extracts the initial sensors and actuators from the morphology. After the sensors and actuators are extracted, the function calls construct_initial_neuro_layer/5, which creates a single layer of neurons connected from the specified sensors and to the specified actuators and then returns the ids of the created neurons. Finally the sensor and actuator ids are extracted and the cortex record is composed and written to the database.
-construct_cortex(AgentId, Generation, SpeciesConstraint) ->
+construct_cortex(AgentId, Generation, SpeciesConstraint, RandomInt) ->
 	CortexId = {{origin, generate_unique_id()}, cortex},
 	Morphology = SpeciesConstraint#constraint.morphology,
 	Sensors = [Sensor#sensor{id={{-1, generate_unique_id()}, sensor}, 
@@ -28,7 +28,7 @@ construct_cortex(AgentId, Generation, SpeciesConstraint) ->
 	Actuators = [Actuator#actuator{id={{1, generate_unique_id()}, actuator}, 
 		cortex_id=CortexId} || Actuator <- morphology:get_init_actuators(Morphology)],
 	NeuronIds = construct_initial_neuro_layer(CortexId, Generation, 
-		SpeciesConstraint, Sensors, Actuators),
+		SpeciesConstraint, Sensors, Actuators, RandomInt),
 	SensorIds = [Sensor#sensor.id || Sensor <- Sensors],
 	ActuatorIds = [Actuator#actuator.id || Actuator <- Actuators],
 	Cortex = #cortex{
@@ -42,24 +42,24 @@ construct_cortex(AgentId, Generation, SpeciesConstraint) ->
 	{CortexId, [{0, NeuronIds}]}.
 
 %% doc Creates a set of neurons for each actuator in the actuator list. The neurons are initialized in construct_initial_neurons/6 where they are connected to the actuator, and from a random subset of the sensors passed tp the function. construct_initial_neurons/6 returns the updated sensors. The actuator's fanin_ids is then updated to include the neuron ids that where connected to it. Once all the actuators have been connected, the sensors and actuators are written to the database and the set of newly created neuron ids is returned to the caller.
-construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators) ->
-	construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, [], []).
+construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, RandomInt) ->
+	construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, RandomInt, [], []).
 construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint,Sensors, 
-	[Actuator|Actuators], ActuatorsAcc, NeuronIdsAcc) ->
+	[Actuator|Actuators], RandomInt, ActuatorsAcc, NeuronIdsAcc) ->
 		NeuronIds = [{{0, Id}, neuron} || Id <- generate_unique_ids(Actuator#actuator.vl)],
 		UpdatedSensors = construct_initial_neurons(CortexId, Generation, SpeciesConstraint, NeuronIds, 
-			Sensors, Actuator),
+			Sensors, Actuator, RandomInt),
 		UpdatedActuator = Actuator#actuator{fanin_ids=NeuronIds},
 		construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, UpdatedSensors, Actuators, 
-			[UpdatedActuator|ActuatorsAcc], lists:append(NeuronIds, NeuronIdsAcc));
+			RandomInt, [UpdatedActuator|ActuatorsAcc], lists:append(NeuronIds, NeuronIdsAcc));
 construct_initial_neuro_layer(_CortexId, _Generation, _SpeciesConstraint, Sensors, [], 
-	ActuatorsAcc, NeuronIdsAcc) ->
+	_RandomInt, ActuatorsAcc, NeuronIdsAcc) ->
 		[write(Sensor) || Sensor <- Sensors],
 		[write(Actuator) || Actuator <- ActuatorsAcc],
 		NeuronIdsAcc.
 
 %% doc Accepts the list of sensors and a single actuator, conncets each neuron to the actuator and randomly chooses whether to connect it from all the sensors or a subset of the given sensors. Once all the neurons have been connected to the actuator and from the sensors, the updated sensors whose fanout_ids have been updated with the ids of the neruons are returned to the caller.
-construct_initial_neurons(CortexId, Generation, SpeciesConstraint, [NeuronId|NeuronIds], Sensors, Actuator) ->
+construct_initial_neurons(CortexId, Generation, SpeciesConstraint, [NeuronId|NeuronIds], Sensors, Actuator, RandomInt) ->
 	case random:uniform() >= 0.5 of
 		true ->
 			Sensor = lists:nth(random:uniform(length(Sensors)), Sensors),
@@ -70,19 +70,21 @@ construct_initial_neurons(CortexId, Generation, SpeciesConstraint, [NeuronId|Neu
 			UpdatedSensors = [Sensor#sensor{fanout_ids=[NeuronId|Sensor#sensor.fanout_ids]} || Sensor <- Sensors],
 			InputSpecs = [{Sensor#sensor.id, Sensor#sensor.vl} || Sensor <- Sensors]
 	end,
-	construct_neuron(CortexId, Generation, SpeciesConstraint, NeuronId, InputSpecs, [Actuator#actuator.id]),
-	construct_initial_neurons(CortexId, Generation, SpeciesConstraint, NeuronIds, UpdatedSensors, Actuator);
-construct_initial_neurons(_CortexId, _Generation, _SpeciesConstraint, [], Sensors, _Actuator) ->
+	construct_neuron(CortexId, Generation, SpeciesConstraint, NeuronId, InputSpecs, 
+		[Actuator#actuator.id], RandomInt),
+	construct_initial_neurons(CortexId, Generation, SpeciesConstraint, NeuronIds, UpdatedSensors, 
+		Actuator, RandomInt);
+construct_initial_neurons(_CortexId, _Generation, _SpeciesConstraint, [], Sensors, _Actuator, _RandomInt) ->
 	Sensors.
 
 %% doc creates the input list from the tuples [{Id, Weights}...] using the vector lenght specified in the InputSpecs list. The activation function that the neuron uses is randomly chosen from the neural_afs list within the constraint record. cconstruct_neuron uses calculate_recursive_inputs/2 to extract the list of recursive connections from the OutputIds passed to it. Once the neuron record is filled in, it is saved to the database.
-construct_neuron(CortexId, Generation, SpeciesConstraint, NeuronId, InputSpecs, OutputIds) ->
+construct_neuron(CortexId, Generation, SpeciesConstraint, NeuronId, InputSpecs, OutputIds, RandomInt) ->
 	InputIdsPlusWeights = create_input_id_plus_weight_tuples(InputSpecs),
 	Neuron = #neuron{
 		id = NeuronId,
 		cortex_id = CortexId,
 		generation = Generation,
-		af = generate_activation_function(SpeciesConstraint#constraint.neural_afs),
+		af = generate_activation_function(SpeciesConstraint#constraint.neural_afs, RandomInt),
 		input_ids_plus_weights = InputIdsPlusWeights,
 		output_ids = OutputIds,
 		recursive_output_ids = calculate_recursive_output_ids(NeuronId, OutputIds)
@@ -106,12 +108,12 @@ create_neural_weights(N, Acc) ->
 	create_neural_weights(N-1, [random:uniform()-0.5|Acc]).
 
 %% doc accetps a list of activation function tags and returns a radomly chosen one. If the list is empty, tanh is returned as a default.
-generate_activation_function(ActivationFunctions) ->
+generate_activation_function(ActivationFunctions, RandomInt) ->
 	case ActivationFunctions of
 		[] ->
 			tanh;
 		Other ->
-			lists:nth(random:uniform(length(Other)), Other)
+			lists:nth(RandomInt(length(Other)), Other)
 	end.
 
 calculate_recursive_output_ids(SelfId, [OutputId|OutputIds]) ->
@@ -488,7 +490,7 @@ test_x() ->
 	CloneAgentId = test_clone,
 	SpeciesConstraint = #constraint{},
 	F = fun() ->
-		construct_agent(AgentId, SpecieId, SpeciesConstraint),
+		construct_agent(AgentId, SpecieId, SpeciesConstraint, fun(N) -> random:uniform(N) end),
 		clone_agent(SpecieId, CloneAgentId),
 		print(AgentId),
 		print(CloneAgentId),
@@ -504,11 +506,11 @@ create_test_x() ->
 	F = fun() ->
 		case read({agent, test}) of
 			undefined ->
-				construct_agent(SpecieId, AgentId, SpeciesConstraint),
+				construct_agent(SpecieId, AgentId, SpeciesConstraint, fun(N) -> random:uniform(N) end),
 				print(AgentId);
 			_ ->
 				delete_agent(AgentId),
-				construct_agent(SpecieId, AgentId, SpeciesConstraint),
+				construct_agent(SpecieId, AgentId, SpeciesConstraint, fun(N) -> random:uniform(N) end),
 				print(AgentId)
 			end
 	end,
