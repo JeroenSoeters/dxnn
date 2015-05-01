@@ -1,6 +1,90 @@
 -module(genotype_mutator).
 -include("records.hrl").
 -compile(export_all).
+-define(DELTA_MULTIPLIER, math:pi()*2).
+-define(SAT_LIMIT, math:pi()*2).
+
+
+%% ===================================================================
+%% Mutation operators
+%% ===================================================================
+
+mutate_weights(AgentId, Randomizer) ->
+	{_RandomFloat, RandomInt} = Randomizer,
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	NeuronIds = Cortex#cortex.neuron_ids,
+	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
+	Neuron = genotype:read({neuron, NeuronId}),
+	UpdatedNeuron = Neuron#neuron{
+		input_ids_plus_weights = perturb_ids_plus_weights(Neuron#neuron.input_ids_plus_weights, Randomizer)
+	},
+	UpdatedAgent = Agent#agent{
+		evo_hist = [{mutate_weights, NeuronId}|Agent#agent.evo_hist]
+	},
+	genotype:write(UpdatedNeuron),
+	genotype:write(UpdatedAgent).
+
+perturb_ids_plus_weights(IdsPlusWeights, Randomizer) ->
+	MP = 1/math:sqrt(length(IdsPlusWeights)),
+	perturb_ids_plus_weights(MP, IdsPlusWeights, Randomizer, []).
+perturb_ids_plus_weights(MP, [{Id, Weights}|IdsPlusWeights], Randomizer, Acc) ->
+	UpdatedWeights = perturb_weights(MP, Weights, Randomizer, []),
+	perturb_ids_plus_weights(MP, IdsPlusWeights, Randomizer, [{Id, UpdatedWeights}|Acc]);
+perturb_ids_plus_weights(_MP, [], _Randomizer, Acc) ->
+	lists:reverse(Acc).
+
+perturb_weights(MP, [W|Weights], Randomizer, Acc) ->
+	{RandomFloat, _RandomInt} = Randomizer,
+	UpdatedWeight = case RandomFloat() < MP of
+		true -> 
+			sat((RandomFloat()-0.5)*?DELTA_MULTIPLIER+W, -?SAT_LIMIT, ?SAT_LIMIT);
+		false ->
+			W
+	end,
+	perturb_weights(MP, Weights, Randomizer, [UpdatedWeight|Acc]);
+perturb_weights(_MP, [], _Randomizer, Acc) ->
+	lists:reverse(Acc).
+	  
+sat(Val, Min, Max) ->
+	if
+		Val < Min -> Min;
+		Val > Max -> Max;
+		true -> Val
+	end.
+
+add_bias(AgentId, Randomizer) ->
+	{RandomFloat, RandomInt} = Randomizer,
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	NeuronIds = Cortex#cortex.neuron_ids,
+	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
+	Generation = Agent#agent.generation,
+	Neuron = genotype:read({neuron, NeuronId}),
+	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
+		true ->
+			exit("******** ERROR: add_bias cannot add bias to neuron ~p as it is already has a bias",
+				[NeuronId]);
+		false ->
+			InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
+			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, RandomFloat()-0.5}]),
+			UpdatedNeuron = Neuron#neuron{
+				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
+				generation = Generation
+			},
+			genotype:write(UpdatedNeuron)
+	end.
+			
+
+
+%% possible optimizations:
+%% get_random_neuron(AgentId)
+
+%% ===================================================================
+%% Creating and cutting links
+%% ===================================================================
 
 %% doc based on the node types it dispatches to the correct link function.
 create_link_between_elements(AgentId, FromElement, ToElement) ->

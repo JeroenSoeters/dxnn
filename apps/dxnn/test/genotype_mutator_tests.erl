@@ -2,6 +2,7 @@
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/records.hrl").
+-define(AGENT, test_agent).
 -define(SENSOR, {{-1, 20}, sensor}).
 -define(ACTUATOR, {{1, 30}, actuator}).
 -define(A, {{-0.5, 40}, neuron}).
@@ -22,6 +23,55 @@ setup() ->
 
 teardown() ->
 	polis:stop().
+
+
+%% ===================================================================
+%% Mutation operators
+%% ===================================================================
+
+mutate_weights_test() ->
+	setup(),
+
+	% This will select neuron C from our cortex since we have 4 neurons.. Neuron Ci has 2 weights.
+	% MP = 1/sqrt(2) is 0.7. We thus expect both weights to be changed as 1 > 0.7.
+	mutate_weights({fun() -> 0.6 end, fun(4) -> 3 end}),	
+	
+	NeuronC = find_neuron(?C),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+
+	?assert(lists:nth(1, NeuronC#neuron.input_ids_plus_weights) =/= 
+		lists:nth(1, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),	
+
+	?assert(lists:nth(2, NeuronC#neuron.input_ids_plus_weights) =/= 
+		lists:nth(2, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),
+	
+	?assert(LastMutation == {mutate_weights, ?C}),	
+
+	teardown().
+
+mutate_weights(Randomizer) ->
+	F = fun() ->
+		genotype_mutator:mutate_weights(?AGENT, Randomizer)
+	end,
+	{atomic, _} = mnesia:transaction(F).
+
+add_bias_test() ->
+	setup(),
+
+	add_bias({fun() -> 0.9 end, fun(4) -> 1 end}),
+
+	NeuronA = find_neuron(?A),
+
+	?assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
+
+	teardown().
+
+add_bias(Randomizer) ->
+	F = fun() ->
+		genotype_mutator:add_bias(?AGENT, Randomizer)
+	end,
+	{atomic, _} = mnesia:transaction(F).
 
 %% ===================================================================
 %% Creating links
@@ -112,13 +162,13 @@ cut_link_between_neuron_and_actuator_test() ->
 
 create_link_between_elements(From, To) ->
 	F = fun() ->
-		genotype_mutator:create_link_between_elements(test, From, To)
+		genotype_mutator:create_link_between_elements(?AGENT, From, To)
 	end,
 	{atomic, _} = mnesia:transaction(F).
 
 cut_link_between_elements(From, To) ->
 	F = fun() ->
-		genotype_mutator:cut_link_between_elements(test, From, To)
+		genotype_mutator:cut_link_between_elements(?AGENT, From, To)
 	end,
 	{atomic, _} = mnesia:transaction(F).
 
@@ -130,6 +180,9 @@ find_sensor(SensorId) ->
 
 find_actuator(ActuatorId) -> 
 	find_node(actuator, ActuatorId).
+
+find_agent(AgentId) ->
+	find_node(agent, AgentId).
 
 find_node(NodeType, NodeId) ->
 	F = fun() ->
@@ -144,7 +197,7 @@ find_node(NodeType, NodeId) ->
 %%    \   /
 %%      B 
 create_test_genotype() ->
-	[#agent{id = test,
+	[#agent{id = ?AGENT,
 			 generation = 0,
 			 population_id = undefined,	
 			 species_id = test,
@@ -167,7 +220,7 @@ create_test_genotype() ->
 		     pattern = [{0,[?A,?B,?C,?D]}]},
 	 #cortex{
 	 	id = {{origin,10},cortex},
-		agent_id = test,
+		agent_id = ?AGENT,
 		neuron_ids = [?A, ?B, ?C, ?D],
 	    sensor_ids = [?SENSOR],
 	    actuator_ids = [?ACTUATOR]},
@@ -212,7 +265,8 @@ create_test_genotype() ->
 		cortex_id = {{origin,10},cortex},
 		af = gauss,
 		input_ids_plus_weights = [
-			{?C, [0.43873748179197447,-0.17357135008390578]}],
+			{?C, [0.43873748179197447,-0.17357135008390578]},
+			{bias, [0.4]}],
 		output_ids = [?ACTUATOR],
 		recursive_output_ids = []},
 	 #actuator{
