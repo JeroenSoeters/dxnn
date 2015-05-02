@@ -110,15 +110,28 @@ mutate_af(AgentId, RandomInt) ->
 	genotype:write(UpdatedNeuron),
 	genotype:write(UpdatedAgent).
 
+add_outlink(AgentId, RandomInt) ->
+	io:format("~nWE'RE HERE!!!! ~n"),
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	Neuron = select_random_neuron(Agent, RandomInt),
+	OutputIds = Neuron#neuron.output_ids,
+	case (Cortex#cortex.neuron_ids ++ Cortex#cortex.actuator_ids) -- OutputIds of
+		[] ->
+			exit("******** ERROR: add_outlink cannot add outlink to neuron ~p as it is already connected to all other elements",
+				[Neuron#neuron.id]);
+		ElementIds ->
+			ToElement = lists:nth(RandomInt(length(ElementIds)), ElementIds),
+			create_link_between_elements(AgentId, Neuron#neuron.id, ToElement)
+	end.
+
 select_random_neuron(Agent, RandomInt) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
 	NeuronIds = Cortex#cortex.neuron_ids,
 	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
 	genotype:read({neuron, NeuronId}).
-
-%% possible optimizations:
-%% get_random_neuron(AgentId)
 
 %% ===================================================================
 %% Creating and cutting links

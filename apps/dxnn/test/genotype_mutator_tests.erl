@@ -10,6 +10,22 @@
 -define(C, {{0, 60}, neuron}).
 -define(D, {{0.5, 70}, neuron}).
 
+genome_mutator_test_() ->
+	{foreach,
+	 fun setup/0,
+	 fun teardown/1,
+	 [fun ?MODULE:mutate_weights_test_/1,
+	  fun ?MODULE:add_bias_test_/1,
+	  fun ?MODULE:remove_bias_test_/1,
+	  fun ?MODULE:mutate_af_test_/1,
+	  %fun ?MODULE:add_outlink_test_/1,
+	  fun ?MODULE:create_link_between_neurons_test_/1,
+	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
+	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
+	  fun ?MODULE:cut_link_between_neurons_test_/1,
+	  fun ?MODULE:cut_link_between_sensor_and_neuron_test_/1,
+	  fun ?MODULE:cut_link_between_neuron_and_actuator_test_/1]}.
+
 %% ===================================================================
 %% Setup and teardown
 %% ===================================================================
@@ -19,19 +35,18 @@ setup() ->
 	F = fun() ->
 		[mnesia:write(R) || R <- create_test_genotype()]
 	end,
-	mnesia:transaction(F).
+	mnesia:transaction(F),
+	meck:new(random, [unstick]).
 
-teardown() ->
-	polis:stop().
-
+teardown(_) ->
+	polis:stop(),
+	meck:unload(random).
 
 %% ===================================================================
 %% Mutation operators
 %% ===================================================================
 
-mutate_weights_test() ->
-	setup(),
-
+mutate_weights_test_(_) ->
 	% This will select neuron C from our cortex since we have 4 neurons.. Neuron Ci has 2 weights.
 	% MP = 1/sqrt(2) is 0.7. We thus expect both weights to be changed as 1 > 0.7.
 	mutate_weights({fun() -> 0.6 end, fun(4) -> 3 end}),	
@@ -40,56 +55,42 @@ mutate_weights_test() ->
 	Agent = find_agent(?AGENT),
 	[LastMutation|_] = Agent#agent.evo_hist,
 
-	?assert(lists:nth(1, NeuronC#neuron.input_ids_plus_weights) =/= 
+	[?_assert(lists:nth(1, NeuronC#neuron.input_ids_plus_weights) =/= 
 		lists:nth(1, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),	
-
-	?assert(lists:nth(2, NeuronC#neuron.input_ids_plus_weights) =/= 
+	?_assert(lists:nth(2, NeuronC#neuron.input_ids_plus_weights) =/= 
 		lists:nth(2, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),
-	
-	?assertEqual({mutate_weights, ?C}, LastMutation),	
-
-	teardown().
+	?_assertEqual({mutate_weights, ?C}, LastMutation)].
 
 mutate_weights(Randomizer) ->
 	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT, Randomizer) end).
 
-add_bias_test() ->
-	setup(),
-
+add_bias_test_(_) ->
 	add_bias({fun() -> 0.9 end, fun(4) -> 1 end}),
 
 	NeuronA = find_neuron(?A),
 	Agent = find_agent(?AGENT),
 	[LastMutation|_] = Agent#agent.evo_hist,
 
-	?assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
-	?assertEqual({add_bias, ?A}, LastMutation),
-
-	teardown().
+	[?_assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
+	?_assertEqual({add_bias, ?A}, LastMutation)].
 
 add_bias(Randomizer) ->
 	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT, Randomizer) end).
 
-remove_bias_test() ->
-	setup(),
-	
+remove_bias_test_(_) ->
 	remove_bias({whatever, fun(4) -> 4 end}),
 
 	NeuronD = find_neuron(?D),
 	Agent = find_agent(?AGENT),
 	[LastMutation|_] = Agent#agent.evo_hist,
 
-	?assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
-	?assertEqual({remove_bias, ?D}, LastMutation),
-
-	teardown().
+	[?_assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
+	?_assertEqual({remove_bias, ?D}, LastMutation)].
 
 remove_bias(Randomizer) ->
 	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT, Randomizer) end).
 
-mutate_af_test() ->
-	setup(),
-
+mutate_af_test_(_) ->
 	% As we have 4 neurons so far and 4-1 = 3 neural afs to choose from we mock RandomInt to 
 	% return 2 which results in changing the AF of neuron b to cos (as defined in records.hrl)
 	% this test breaks as we add more activation functions in records.hrl.
@@ -99,100 +100,93 @@ mutate_af_test() ->
 	Agent = find_agent(?AGENT),	
 	[LastMutation|_] = Agent#agent.evo_hist,
 	
-	?assertEqual(cos, NeuronB#neuron.af),	
-	?assertEqual({mutate_af, ?B}, LastMutation),
-
-	teardown().
+	[?_assertEqual(cos, NeuronB#neuron.af),	
+	?_assertEqual({mutate_af, ?B}, LastMutation)].
 
 mutate_af(RandomInt) ->
 	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT, RandomInt) end).
+
+add_outlink_test_(_) ->
+	% The number of neurons is 4, so this RandomInt will select neuron b. Since there is
+	% only 1 actuator the number of available elements will also be 4 (4+1-1)
+
+	NeuronB = find_neuron(?B),
+	NeuronD = find_neuron(?D),
+
+	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
+	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
+
+add_outlink(RandomInt) ->
+	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT, RandomInt) end).
 
 %% ===================================================================
 %% Creating links
 %% ===================================================================
 
-create_link_between_neurons_test() ->
-	setup(),
+create_link_between_neurons_test_(_) ->
+	meck:sequence(random, uniform, 0, [0.6]),
 
 	create_link_between_elements(?A, ?B),
 	
 	NeuronA = find_neuron(?A),
 	NeuronB = find_neuron(?B),
 	
-	?assert(lists:member(?B, NeuronA#neuron.output_ids)),
-	?assert(lists:member(?B, NeuronA#neuron.recursive_output_ids)),
-	?assert(lists:keymember(?A, 1, NeuronB#neuron.input_ids_plus_weights)),
+	[?_assert(lists:member(?B, NeuronA#neuron.output_ids)),
+	?_assert(lists:member(?B, NeuronA#neuron.recursive_output_ids)),
+	?_assert(lists:keymember(?A, 1, NeuronB#neuron.input_ids_plus_weights))].
 
-	teardown().
-
-create_link_betweem_sensor_and_neuron_test() ->
-	setup(),
+create_link_between_sensor_and_neuron_test_(_) ->
+	meck:sequence(random, uniform, 0, [0.6]),
 
     create_link_between_elements(?SENSOR, ?C),
 	
 	Sensor = find_sensor(?SENSOR),	
 	NeuronC = find_neuron(?C),
 
-	?assert(lists:member(?C, Sensor#sensor.fanout_ids)),
-	?assert(lists:keymember(?SENSOR, 1, NeuronC#neuron.input_ids_plus_weights)),
+	[?_assert(lists:member(?C, Sensor#sensor.fanout_ids)),
+	?_assert(lists:keymember(?SENSOR, 1, NeuronC#neuron.input_ids_plus_weights))].
 
-	teardown().
-
-create_link_between_neuron_and_actuator_test() ->
-	setup(),
+create_link_between_neuron_and_actuator_test_(_) ->
+	meck:sequence(random, uniform, 0, [0.6]),
 
 	create_link_between_elements(?B, ?ACTUATOR),
 
 	NeuronB = find_neuron(?B),
 	Actuator = find_actuator(?ACTUATOR),
 
-	?assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
-	?assert(lists:member(?B, Actuator#actuator.fanin_ids)),
-
-	teardown().
+	[?_assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
+	?_assert(lists:member(?B, Actuator#actuator.fanin_ids))].
 
 %% ===================================================================
 %% Cutting links
 %% ===================================================================
 
-cut_link_between_neurons_test() ->
-	setup(),
-
+cut_link_between_neurons_test_(_) ->
 	cut_link_between_elements(?A, ?C),
 
 	NeuronA = find_neuron(?A),
 	NeuronC = find_neuron(?C),
 
-	?assert(not lists:member(?C, NeuronA#neuron.output_ids)),
-	?assert(not lists:keymember(?A, 1, NeuronC#neuron.input_ids_plus_weights)),	
+	[?_assert(not lists:member(?C, NeuronA#neuron.output_ids)),
+	?_assert(not lists:keymember(?A, 1, NeuronC#neuron.input_ids_plus_weights))].
 
-	teardown().
-
-cut_link_between_sensor_and_neuron_test() ->
-	setup(),
-
+cut_link_between_sensor_and_neuron_test_(_) ->
 	cut_link_between_elements(?SENSOR, ?A),
 	
 	Sensor = find_sensor(?SENSOR),
 	NeuronA = find_neuron(?A),
 
-	?assert(not lists:member(?A, Sensor#sensor.fanout_ids)),
-	?assert(not lists:keymember(?SENSOR, 1, NeuronA#neuron.input_ids_plus_weights)),
+	[?_assert(not lists:member(?A, Sensor#sensor.fanout_ids)),
+	?_assert(not lists:keymember(?SENSOR, 1, NeuronA#neuron.input_ids_plus_weights))].
 
-	teardown().
-
-cut_link_between_neuron_and_actuator_test() ->
-	setup(),
-
+cut_link_between_neuron_and_actuator_test_(_) ->
 	cut_link_between_elements(?D, ?ACTUATOR),
 	
 	NeuronD = find_neuron(?D),
 	Actuator = find_actuator(?ACTUATOR),
 
-	?assert(not lists:member(?ACTUATOR, NeuronD#neuron.output_ids)),
-	?assert(not lists:member(?D, Actuator#actuator.fanin_ids)),
-
-	teardown().
+	[?_assert(not lists:member(?ACTUATOR, NeuronD#neuron.output_ids)),
+	?_assert(not lists:member(?D, Actuator#actuator.fanin_ids))].
 
 create_link_between_elements(From, To) ->
 	in_transaction(fun() -> genotype_mutator:create_link_between_elements(?AGENT, From, To) end).
