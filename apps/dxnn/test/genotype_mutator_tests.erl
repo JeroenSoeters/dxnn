@@ -64,7 +64,7 @@ mutate_weights_test_(_) ->
 	meck:sequence(random, uniform, 1, [3]),
 	meck:sequence(random, uniform, 0, [0.4, 0.6]),
 
-	mutate_weights(),	
+	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT) end),	
 	
 	NeuronC = find_neuron(?C),
 	Agent = find_agent(?AGENT),
@@ -76,14 +76,11 @@ mutate_weights_test_(_) ->
 		lists:nth(2, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),
 	?_assertEqual({mutate_weights, ?C}, LastMutation)].
 
-mutate_weights() ->
-	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT) end).
-
 add_bias_test_(_) ->
 	meck:sequence(random, uniform, 1, [1]),
 	meck:sequence(random, uniform, 0, [0.9]),
 
-	add_bias(),
+	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT) end),
 
 	NeuronA = find_neuron(?A),
 	Agent = find_agent(?AGENT),
@@ -92,13 +89,10 @@ add_bias_test_(_) ->
 	[?_assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
 	?_assertEqual({add_bias, ?A}, LastMutation)].
 
-add_bias() ->
-	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT) end).
-
 remove_bias_test_(_) ->
 	meck:sequence(random, uniform, 1, [4]),
 
-	remove_bias(),
+	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT) end),
 
 	NeuronD = find_neuron(?D),
 	Agent = find_agent(?AGENT),
@@ -107,25 +101,20 @@ remove_bias_test_(_) ->
 	[?_assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
 	?_assertEqual({remove_bias, ?D}, LastMutation)].
 
-remove_bias() ->
-	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT) end).
-
 mutate_af_test_(_) ->
 	% As we have 4 neurons so far and 4-1 = 3 neural afs to choose from we mock RandomInt to 
 	% return 2 which results in changing the AF of neuron b to cos (as defined in records.hrl)
 	% this test breaks as we add more activation functions in records.hrl.
 	meck:sequence(random, uniform, 1, [2]),
-	mutate_af(),
+	
+	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT) end),
 
 	NeuronB = find_neuron(?B),
 	Agent = find_agent(?AGENT),	
-	[LastMutation|_] = Agent#agent.evo_hist,
 	
+	[LastMutation|_] = Agent#agent.evo_hist,
 	[?_assertEqual(cos, NeuronB#neuron.af),	
 	?_assertEqual({mutate_af, ?B}, LastMutation)].
-
-mutate_af() ->
-	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT) end).
 
 add_outlink_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
@@ -133,16 +122,13 @@ add_outlink_test_(_) ->
 	meck:sequence(random, uniform, 1, [2, 3]),
 	meck:sequence(random, uniform, 0, [0.2, 0.3]),
 
-	add_outlink(),
+	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end),
 
 	NeuronB = find_neuron(?B),
 	NeuronD = find_neuron(?D),
 
 	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
 	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
-
-add_outlink() ->
-	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end).
 
 %% ===================================================================
 %% Creating links
