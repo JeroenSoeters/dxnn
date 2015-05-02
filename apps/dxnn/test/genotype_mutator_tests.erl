@@ -18,7 +18,8 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_bias_test_/1,
 	  fun ?MODULE:remove_bias_test_/1,
 	  fun ?MODULE:mutate_af_test_/1,
-	  fun ?MODULE:add_outlink_test_/1,
+	  fun ?MODULE:add_outlink_to_neuron_test_/1,
+	  fun ?MODULE:add_outlink_to_actuator_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -116,7 +117,7 @@ mutate_af_test_(_) ->
 	[?_assertEqual(cos, NeuronB#neuron.af),	
 	?_assertEqual({mutate_af, ?B}, LastMutation)].
 
-add_outlink_test_(_) ->
+add_outlink_to_neuron_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
 	% the second element, d is then the 3rd as c is removed from the list as it's already connected.
 	meck:sequence(random, uniform, 1, [2, 3]),
@@ -129,6 +130,21 @@ add_outlink_test_(_) ->
 
 	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
 	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
+
+add_outlink_to_actuator_test_(_) ->
+	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
+	% the second element, actuator is then the 4rd as c is removed from the list as it's already connected.
+	meck:sequence(random, uniform, 1, [2, 4]),
+	meck:sequence(random, uniform, 0, [0.2, 0.3]),
+
+	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end),
+
+	NeuronB = find_neuron(?B),
+	Actuator = find_actuator(?ACTUATOR),
+
+	[?_assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
+	?_assert(lists:member(?B, Actuator#actuator.fanin_ids))].
+	
 
 %% ===================================================================
 %% Creating links

@@ -107,7 +107,6 @@ mutate_af(AgentId) ->
 	genotype:write(UpdatedAgent).
 
 add_outlink(AgentId) ->
-	io:format("~nWE'RE HERE!!!! ~n"),
 	Agent = genotype:read({agent, AgentId}),
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
@@ -166,6 +165,7 @@ create_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
 	Generation = get_generation(AgentId),
 	Actuator = genotype:read({actuator, ActuatorId}),
 	UpdatedActuator = link_to_actuator(Actuator, NeuronId),
+	io:format("~n updated actuator: ~p~n", [UpdatedActuator]),
 	genotype:write(UpdatedActuator),
 	Neuron = genotype:read({neuron, NeuronId}),
 	UpdatedNeuron = link_from_neuron(Neuron, ActuatorId, Generation),
