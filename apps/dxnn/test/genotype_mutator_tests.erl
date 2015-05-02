@@ -18,7 +18,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_bias_test_/1,
 	  fun ?MODULE:remove_bias_test_/1,
 	  fun ?MODULE:mutate_af_test_/1,
-	  %fun ?MODULE:add_outlink_test_/1,
+	  fun ?MODULE:add_outlink_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -31,12 +31,24 @@ genome_mutator_test_() ->
 %% ===================================================================
 
 setup() ->
-	polis:start(),
+	case whereis(polis) of
+		undefined ->
+			mnesia:start(),
+			polis:start();
+		_ -> 
+			polis:reset()
+	end,
 	F = fun() ->
 		[mnesia:write(R) || R <- create_test_genotype()]
 	end,
 	mnesia:transaction(F),
-	meck:new(random, [unstick]).
+	case whereis(random_meck) of
+		undefined ->
+			meck:new(random, [unstick]);
+		_ ->
+			meck:unload(random),
+			meck:new(random, [unstick])
+	end.
 
 teardown(_) ->
 	polis:stop(),
@@ -49,7 +61,10 @@ teardown(_) ->
 mutate_weights_test_(_) ->
 	% This will select neuron C from our cortex since we have 4 neurons.. Neuron Ci has 2 weights.
 	% MP = 1/sqrt(2) is 0.7. We thus expect both weights to be changed as 1 > 0.7.
-	mutate_weights({fun() -> 0.6 end, fun(4) -> 3 end}),	
+	meck:sequence(random, uniform, 1, [3]),
+	meck:sequence(random, uniform, 0, [0.4, 0.6]),
+
+	mutate_weights(),	
 	
 	NeuronC = find_neuron(?C),
 	Agent = find_agent(?AGENT),
@@ -61,11 +76,14 @@ mutate_weights_test_(_) ->
 		lists:nth(2, (lists:nth(6, create_test_genotype()))#neuron.input_ids_plus_weights)),
 	?_assertEqual({mutate_weights, ?C}, LastMutation)].
 
-mutate_weights(Randomizer) ->
-	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT, Randomizer) end).
+mutate_weights() ->
+	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT) end).
 
 add_bias_test_(_) ->
-	add_bias({fun() -> 0.9 end, fun(4) -> 1 end}),
+	meck:sequence(random, uniform, 1, [1]),
+	meck:sequence(random, uniform, 0, [0.9]),
+
+	add_bias(),
 
 	NeuronA = find_neuron(?A),
 	Agent = find_agent(?AGENT),
@@ -74,11 +92,13 @@ add_bias_test_(_) ->
 	[?_assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
 	?_assertEqual({add_bias, ?A}, LastMutation)].
 
-add_bias(Randomizer) ->
-	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT, Randomizer) end).
+add_bias() ->
+	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT) end).
 
 remove_bias_test_(_) ->
-	remove_bias({whatever, fun(4) -> 4 end}),
+	meck:sequence(random, uniform, 1, [4]),
+
+	remove_bias(),
 
 	NeuronD = find_neuron(?D),
 	Agent = find_agent(?AGENT),
@@ -87,14 +107,15 @@ remove_bias_test_(_) ->
 	[?_assertNot(lists:keymember(bias, 1, NeuronD#neuron.input_ids_plus_weights)),
 	?_assertEqual({remove_bias, ?D}, LastMutation)].
 
-remove_bias(Randomizer) ->
-	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT, Randomizer) end).
+remove_bias() ->
+	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT) end).
 
 mutate_af_test_(_) ->
 	% As we have 4 neurons so far and 4-1 = 3 neural afs to choose from we mock RandomInt to 
 	% return 2 which results in changing the AF of neuron b to cos (as defined in records.hrl)
 	% this test breaks as we add more activation functions in records.hrl.
-	mutate_af(fun(_) -> 2 end),
+	meck:sequence(random, uniform, 1, [2]),
+	mutate_af(),
 
 	NeuronB = find_neuron(?B),
 	Agent = find_agent(?AGENT),	
@@ -103,12 +124,16 @@ mutate_af_test_(_) ->
 	[?_assertEqual(cos, NeuronB#neuron.af),	
 	?_assertEqual({mutate_af, ?B}, LastMutation)].
 
-mutate_af(RandomInt) ->
-	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT, RandomInt) end).
+mutate_af() ->
+	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT) end).
 
 add_outlink_test_(_) ->
-	% The number of neurons is 4, so this RandomInt will select neuron b. Since there is
-	% only 1 actuator the number of available elements will also be 4 (4+1-1)
+	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
+	% the second element, d is then the 3rd as c is removed from the list as it's already connected.
+	meck:sequence(random, uniform, 1, [2, 3]),
+	meck:sequence(random, uniform, 0, [0.2, 0.3]),
+
+	add_outlink(),
 
 	NeuronB = find_neuron(?B),
 	NeuronD = find_neuron(?D),
@@ -116,8 +141,8 @@ add_outlink_test_(_) ->
 	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
 	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
 
-add_outlink(RandomInt) ->
-	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT, RandomInt) end).
+add_outlink() ->
+	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end).
 
 %% ===================================================================
 %% Creating links

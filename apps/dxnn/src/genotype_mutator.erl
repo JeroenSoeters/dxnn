@@ -9,12 +9,11 @@
 %% Mutation operators
 %% ===================================================================
 
-mutate_weights(AgentId, Randomizer) ->
+mutate_weights(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
-	{_RandomFloat, RandomInt} = Randomizer,
-	Neuron = select_random_neuron(Agent, RandomInt),
+	Neuron = select_random_neuron(Agent),
 	UpdatedNeuron = Neuron#neuron{
-		input_ids_plus_weights = perturb_ids_plus_weights(Neuron#neuron.input_ids_plus_weights, Randomizer)
+		input_ids_plus_weights = perturb_ids_plus_weights(Neuron#neuron.input_ids_plus_weights)
 	},
 	UpdatedAgent = Agent#agent{
 		evo_hist = [{mutate_weights, Neuron#neuron.id}|Agent#agent.evo_hist]
@@ -22,25 +21,24 @@ mutate_weights(AgentId, Randomizer) ->
 	genotype:write(UpdatedNeuron),
 	genotype:write(UpdatedAgent).
 
-perturb_ids_plus_weights(IdsPlusWeights, Randomizer) ->
+perturb_ids_plus_weights(IdsPlusWeights) ->
 	MP = 1/math:sqrt(length(IdsPlusWeights)),
-	perturb_ids_plus_weights(MP, IdsPlusWeights, Randomizer, []).
-perturb_ids_plus_weights(MP, [{Id, Weights}|IdsPlusWeights], Randomizer, Acc) ->
-	UpdatedWeights = perturb_weights(MP, Weights, Randomizer, []),
-	perturb_ids_plus_weights(MP, IdsPlusWeights, Randomizer, [{Id, UpdatedWeights}|Acc]);
-perturb_ids_plus_weights(_MP, [], _Randomizer, Acc) ->
+	perturb_ids_plus_weights(MP, IdsPlusWeights, []).
+perturb_ids_plus_weights(MP, [{Id, Weights}|IdsPlusWeights], Acc) ->
+	UpdatedWeights = perturb_weights(MP, Weights, []),
+	perturb_ids_plus_weights(MP, IdsPlusWeights, [{Id, UpdatedWeights}|Acc]);
+perturb_ids_plus_weights(_MP, [], Acc) ->
 	lists:reverse(Acc).
 
-perturb_weights(MP, [W|Weights], Randomizer, Acc) ->
-	{RandomFloat, _RandomInt} = Randomizer,
-	UpdatedWeight = case RandomFloat() < MP of
+perturb_weights(MP, [W|Weights], Acc) ->
+	UpdatedWeight = case random:uniform() < MP of
 		true -> 
-			sat((RandomFloat()-0.5)*?DELTA_MULTIPLIER+W, -?SAT_LIMIT, ?SAT_LIMIT);
+			sat((random:uniform()-0.5)*?DELTA_MULTIPLIER+W, -?SAT_LIMIT, ?SAT_LIMIT);
 		false ->
 			W
 	end,
-	perturb_weights(MP, Weights, Randomizer, [UpdatedWeight|Acc]);
-perturb_weights(_MP, [], _Randomizer, Acc) ->
+	perturb_weights(MP, Weights, [UpdatedWeight|Acc]);
+perturb_weights(_MP, [], Acc) ->
 	lists:reverse(Acc).
 	  
 sat(Val, Min, Max) ->
@@ -50,18 +48,17 @@ sat(Val, Min, Max) ->
 		true -> Val
 	end.
 
-add_bias(AgentId, Randomizer) ->
-	{RandomFloat, RandomInt} = Randomizer,
+add_bias(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
-	Neuron = select_random_neuron(Agent, RandomInt),
+	Neuron = select_random_neuron(Agent),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		true ->
 			exit("******** ERROR: add_bias cannot add bias to neuron ~p as it is already has a bias",
 				[Neuron#neuron.id]);
 		false ->
 			InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
-			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, RandomFloat()-0.5}]),
+			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, random:uniform()-0.5}]),
 			UpdatedNeuron = Neuron#neuron{
 				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
 				generation = Generation
@@ -73,11 +70,10 @@ add_bias(AgentId, Randomizer) ->
 			genotype:write(UpdatedAgent)
 	end.
 			
-remove_bias(AgentId, Randomizer) ->
-	{_RandomFloat, RandomInt} = Randomizer,
+remove_bias(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
-	Neuron = select_random_neuron(Agent, RandomInt),
+	Neuron = select_random_neuron(Agent),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		false ->
 			exit("******** ERROR: add_bias cannot remove bias from neuron ~p as it is doesn't has a bias",
@@ -95,13 +91,13 @@ remove_bias(AgentId, Randomizer) ->
 			genotype:write(UpdatedAgent)
 	end.
 		
-mutate_af(AgentId, RandomInt) ->
+mutate_af(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
-	Neuron = select_random_neuron(Agent, RandomInt),
+	Neuron = select_random_neuron(Agent),
 	ActivationFunctions = (Agent#agent.constraint)#constraint.neural_afs -- [Neuron#neuron.af],
 	UpdatedNeuron = Neuron#neuron{
-		af = genotype:generate_activation_function(ActivationFunctions, RandomInt),
+		af = genotype:generate_activation_function(ActivationFunctions),
 		generation = Generation
 	},
 	UpdatedAgent = Agent#agent{
@@ -110,27 +106,27 @@ mutate_af(AgentId, RandomInt) ->
 	genotype:write(UpdatedNeuron),
 	genotype:write(UpdatedAgent).
 
-add_outlink(AgentId, RandomInt) ->
+add_outlink(AgentId) ->
 	io:format("~nWE'RE HERE!!!! ~n"),
 	Agent = genotype:read({agent, AgentId}),
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
-	Neuron = select_random_neuron(Agent, RandomInt),
+	Neuron = select_random_neuron(Agent),
 	OutputIds = Neuron#neuron.output_ids,
 	case (Cortex#cortex.neuron_ids ++ Cortex#cortex.actuator_ids) -- OutputIds of
 		[] ->
 			exit("******** ERROR: add_outlink cannot add outlink to neuron ~p as it is already connected to all other elements",
 				[Neuron#neuron.id]);
 		ElementIds ->
-			ToElement = lists:nth(RandomInt(length(ElementIds)), ElementIds),
+			ToElement = lists:nth(random:uniform(length(ElementIds)), ElementIds),
 			create_link_between_elements(AgentId, Neuron#neuron.id, ToElement)
 	end.
 
-select_random_neuron(Agent, RandomInt) ->
+select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
 	NeuronIds = Cortex#cortex.neuron_ids,
-	NeuronId = lists:nth(RandomInt(length(NeuronIds)), NeuronIds),
+	NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
 	genotype:read({neuron, NeuronId}).
 
 %% ===================================================================
