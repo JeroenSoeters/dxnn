@@ -118,7 +118,11 @@ add_outlink(AgentId) ->
 				[Neuron#neuron.id]);
 		ElementIds ->
 			ToElement = lists:nth(random:uniform(length(ElementIds)), ElementIds),
-			create_link_between_elements(AgentId, Neuron#neuron.id, ToElement)
+			create_link_between_elements(AgentId, Neuron#neuron.id, ToElement),
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_outlink, Neuron#neuron.id, ToElement}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedAgent)
 	end.
 
 select_random_neuron(Agent) ->

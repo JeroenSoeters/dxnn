@@ -112,8 +112,8 @@ mutate_af_test_(_) ->
 
 	NeuronB = find_neuron(?B),
 	Agent = find_agent(?AGENT),	
-	
 	[LastMutation|_] = Agent#agent.evo_hist,
+
 	[?_assertEqual(cos, NeuronB#neuron.af),	
 	?_assertEqual({mutate_af, ?B}, LastMutation)].
 
@@ -127,9 +127,12 @@ add_outlink_to_neuron_test_(_) ->
 
 	NeuronB = find_neuron(?B),
 	NeuronD = find_neuron(?D),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
 
 	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
-	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
+	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights)),
+	?_assertEqual({add_outlink, ?B, ?D}, LastMutation)].
 
 add_outlink_to_actuator_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
@@ -141,9 +144,12 @@ add_outlink_to_actuator_test_(_) ->
 
 	NeuronB = find_neuron(?B),
 	Actuator = find_actuator(?ACTUATOR),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
 
 	[?_assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
-	?_assert(lists:member(?B, Actuator#actuator.fanin_ids))].
+	?_assert(lists:member(?B, Actuator#actuator.fanin_ids)),
+	?_assertEqual({add_outlink, ?B, ?ACTUATOR}, LastMutation)].
 	
 
 %% ===================================================================
