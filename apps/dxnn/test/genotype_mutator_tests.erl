@@ -21,6 +21,8 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_outlink_to_neuron_test_/1,
 	  fun ?MODULE:add_outlink_to_actuator_test_/1,
 	  fun ?MODULE:add_inlink_from_neuron_test_/1,
+	  fun ?MODULE:add_sensorlink_test_/1,
+	  fun ?MODULE:add_actuatorlink_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -184,6 +186,39 @@ add_inlink_from_sensor_test_(_) ->
 	[?_assert(lists:member(?SENSOR, Sensor#sensor.fanout_ids)),
 	 ?_assert(lists:keymember(?SENSOR, 1, NeuronD#neuron.input_ids_plus_weights)),
 	 ?_assertEqual({add_inlink, ?SENSOR, ?D}, LastMutation)].
+
+add_sensorlink_test_(_) ->
+	% We connect the first sensor from the available list of sensors (there is only one) to the
+	% first neuron from the available list of neurons [c, d] so neuron c.
+	meck:sequence(random, uniform, 1, [1, 1]),
+	meck:sequence(random, uniform, 0, [0.5, 0.6]),
+	
+	in_transaction(fun() -> genotype_mutator:add_sensorlink(?AGENT) end),
+
+	Sensor = find_sensor(?SENSOR),
+	NeuronC = find_neuron(?C),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,	
+
+	[?_assert(lists:member(?C, Sensor#sensor.fanout_ids)),
+	 ?_assert(lists:keymember(?SENSOR, 1, NeuronC#neuron.input_ids_plus_weights)),
+	 ?_assertEqual({add_sensorlink, ?SENSOR, ?C}, LastMutation)].
+
+add_actuatorlink_test_(_) ->
+	% We connect the first actuator from the list (there is only one) to the first nueron of
+	% the list of available neurons [a, b, c] which is neuron a.
+	meck:sequence(random, uniform, 1, [1, 1]),
+
+	in_transaction(fun() -> genotype_mutator:add_actuatorlink(?AGENT) end),
+	
+	NeuronA = find_neuron(?A),
+	Actuator = find_actuator(?ACTUATOR),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+
+	[?_assert(lists:member(?ACTUATOR, NeuronA#neuron.output_ids)),
+	 ?_assert(lists:member(?A, Actuator#actuator.fanin_ids)),
+	 ?_assertEqual({add_actuatorlink, ?A, ?ACTUATOR}, LastMutation)].
 
 %% ===================================================================
 %% Creating links
@@ -365,5 +400,5 @@ create_test_genotype() ->
 		cortex_id = {{origin,10},cortex},
 		name = xor_send_output,
 		scape = {private,xor_sim},
-		vl =1,
+		vl = 2,
 		fanin_ids = [?D]}].

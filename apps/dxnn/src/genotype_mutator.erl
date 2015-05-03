@@ -131,7 +131,7 @@ add_inlink(AgentId) ->
 	Cortex = genotype:read({cortex, CortexId}),
 	Neuron = select_random_neuron(Agent),
 	InputIds = [Id || {Id, _Weights} <- Neuron#neuron.input_ids_plus_weights],
-	case (Cortex#cortex.sensor_ids ++ Cortex#cortex.neuron_ids) -- [Neuron#neuron.id] of 
+	case (Cortex#cortex.sensor_ids ++ Cortex#cortex.neuron_ids) -- InputIds of 
 		[] ->
 			exit("******** ERROR: add_inlink cannot add inlink to neuron ~p as it is already connected to all other elements", [Neuron#neuron.id]);
 		ElementIds ->
@@ -139,6 +139,44 @@ add_inlink(AgentId) ->
 			create_link_between_elements(AgentId, FromElement, Neuron#neuron.id),
 			UpdatedAgent = Agent#agent{
 				evo_hist = [{add_inlink, FromElement, Neuron#neuron.id}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedAgent)
+	end.
+
+add_sensorlink(AgentId) ->
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	SensorId = lists:nth(random:uniform(length(Cortex#cortex.sensor_ids)), Cortex#cortex.sensor_ids),
+	Sensor = genotype:read({sensor, SensorId}),
+	FanoutIds = Sensor#sensor.fanout_ids,
+	case Cortex#cortex.neuron_ids -- FanoutIds of
+		[] -> 
+			exit("******** ERROR: add_sensor cannot add inlink to sensor ~p as it is already connected to all neurons", [Sensor#sensor.id]);
+		NeuronIds ->
+			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+			create_link_between_elements(AgentId, SensorId, NeuronId),
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_sensorlink, Sensor#sensor.id, NeuronId}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedAgent)
+	end.
+
+add_actuatorlink(AgentId) ->
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	ActuatorId = lists:nth(random:uniform(length(Cortex#cortex.actuator_ids)), Cortex#cortex.actuator_ids),
+	Actuator = genotype:read({actuator, ActuatorId}),
+	FaninIds = Actuator#actuator.fanin_ids,
+	case Cortex#cortex.neuron_ids -- FaninIds of
+		[] -> 
+			exit("******** ERROR: add_sensor cannot add inlink to sensor ~p as it is already connected to all neurons", [Actuator#actuator.id]);
+		NeuronIds ->
+			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+			create_link_between_elements(AgentId, NeuronId, ActuatorId),
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_actuatorlink, NeuronId, Actuator#actuator.id}|Agent#agent.evo_hist]
 			},
 			genotype:write(UpdatedAgent)
 	end.
@@ -206,7 +244,7 @@ link_from_sensor(Sensor, NeuronId) ->
 
 link_to_actuator(Actuator, NeuronId) ->
 	FaninIds = Actuator#actuator.fanin_ids,
-	case lists:member(NeuronId, FaninIds) of
+	case length(FaninIds) >= Actuator#actuator.vl of
 		true ->
 			exit("******** ERROR: link_to_actuator cannot add ~p to fanin of ~p as it is already connected",
 				[NeuronId, Actuator#actuator.id]);
