@@ -125,6 +125,24 @@ add_outlink(AgentId) ->
 			genotype:write(UpdatedAgent)
 	end.
 
+add_inlink(AgentId) ->
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	Neuron = select_random_neuron(Agent),
+	InputIds = [Id || {Id, _Weights} <- Neuron#neuron.input_ids_plus_weights],
+	case (Cortex#cortex.sensor_ids ++ Cortex#cortex.neuron_ids) -- [Neuron#neuron.id] of 
+		[] ->
+			exit("******** ERROR: add_inlink cannot add inlink to neuron ~p as it is already connected to all other elements", [Neuron#neuron.id]);
+		ElementIds ->
+			FromElement = lists:nth(random:uniform(length(ElementIds)), ElementIds),
+			create_link_between_elements(AgentId, FromElement, Neuron#neuron.id),
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_inlink, FromElement, Neuron#neuron.id}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedAgent)
+	end.
+
 select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
@@ -138,6 +156,7 @@ select_random_neuron(Agent) ->
 
 %% doc based on the node types it dispatches to the correct link function.
 create_link_between_elements(AgentId, FromElement, ToElement) ->
+	io:format("~nlinking ~p to ~p", [FromElement, ToElement]),
 	case {FromElement, ToElement} of
 		{{_FromId, neuron}, {_ToId, neuron}} ->
 			create_link_between_neurons(AgentId, FromElement, ToElement);

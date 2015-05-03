@@ -20,6 +20,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:mutate_af_test_/1,
 	  fun ?MODULE:add_outlink_to_neuron_test_/1,
 	  fun ?MODULE:add_outlink_to_actuator_test_/1,
+	  fun ?MODULE:add_inlink_from_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -138,7 +139,6 @@ add_outlink_to_actuator_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
 	% the second element, actuator is then the 4rd as c is removed from the list as it's already connected.
 	meck:sequence(random, uniform, 1, [2, 4]),
-	meck:sequence(random, uniform, 0, [0.2, 0.3]),
 
 	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end),
 
@@ -151,6 +151,39 @@ add_outlink_to_actuator_test_(_) ->
 	?_assert(lists:member(?B, Actuator#actuator.fanin_ids)),
 	?_assertEqual({add_outlink, ?B, ?ACTUATOR}, LastMutation)].
 	
+add_inlink_from_neuron_test_(_) ->
+	% First we select neuron a with index one. We then connect it to the  fourth index of the list
+    % (sensor ids ++ neuron ids) -- input ids which is [a, b, c, d] so neuron d.
+	meck:sequence(random, uniform, 1, [1, 4]),
+	meck:sequence(random, uniform, 0, [0.4, 0.9]),
+
+	in_transaction(fun() -> genotype_mutator:add_inlink(?AGENT) end),
+
+	NeuronA = find_neuron(?A),
+	NeuronD = find_neuron(?D),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+
+	[?_assert(lists:member(?A, NeuronD#neuron.output_ids)),
+	 ?_assert(lists:keymember(?D, 1, NeuronA#neuron.input_ids_plus_weights)),
+	 ?_assertEqual({add_inlink, ?D, ?A}, LastMutation)].
+
+add_inlink_from_sensor_test_(_) ->
+	% First we select neuron d with index 4. We then connect it to the  first index of the list
+    % (sensor ids ++ neuron ids) -- input ids which is [sensor, a, b, d] so the sensor.
+	meck:sequence(random, uniform, 1, [4, 1]),
+	meck:sequence(random, uniform, 0, [0.4, 0.9]),
+
+	in_transaction(fun() -> genotype_mutator:add_inlink(?AGENT) end),
+
+	Sensor = find_sensor(?SENSOR),
+	NeuronD = find_neuron(?D),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+
+	[?_assert(lists:member(?SENSOR, Sensor#sensor.fanout_ids)),
+	 ?_assert(lists:keymember(?SENSOR, 1, NeuronD#neuron.input_ids_plus_weights)),
+	 ?_assertEqual({add_inlink, ?SENSOR, ?D}, LastMutation)].
 
 %% ===================================================================
 %% Creating links
