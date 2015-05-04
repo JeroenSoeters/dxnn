@@ -25,7 +25,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_sensorlink_test_/1,
 	  fun ?MODULE:add_actuatorlink_test_/1,
 	  fun ?MODULE:add_neuron_test_/1,
-%	  fun ?MODULE:outsplice_test_/1,
+	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -263,16 +263,31 @@ add_neuron_test_(_) ->
 outsplice_test_(_) ->
 	NewNeuronId = {{0.25, 80.0}, neuron},
 
+	% The first result in the sequence is the index of the neuron that we're gonna connect from.
+	% The second is the index in it's output ids (there is only one) where we are going to connect to.
+	% The third result is the index of the random activation function for the new neuron.
 	meck:sequence(random, uniform, 1, [3, 1, 1]),
+	
+	meck:sequence(random, uniform, 0, [0.6, 0.6]),
 	
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> genotype:outsplice(?AGENT, FakeTimeProvider) end),
+	in_transaction(fun() -> genotype_mutator:outsplice(?AGENT, FakeTimeProvider) end),
 
+	NewNeuron = find_neuron(NewNeuronId),
 	NeuronC = find_neuron(?C),
 	NeuronD = find_neuron(?D),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+	Cortex = find_cortex(?CORTEX),
 
-	[?_assert(lists:member(NewNeuronId, NeuronC#neuron.output_ids))].
+	[?_assert(lists:keymember(?C, 1, NewNeuron#neuron.input_ids_plus_weights)),
+	 ?_assert(lists:member(?D, NewNeuron#neuron.output_ids)),
+	 ?_assert(lists:member(NewNeuronId, NeuronC#neuron.output_ids)),
+	 ?_assert(lists:keymember(NewNeuronId, 1, NeuronD#neuron.input_ids_plus_weights)),
+	 ?_assertEqual({outsplice, ?C, NewNeuronId, ?D}, LastMutation),
+	 ?_assert(lists:member({0.25, [NewNeuronId]}, Agent#agent.pattern)),
+	 ?_assert(lists:member(NewNeuronId, Cortex#cortex.neuron_ids))].
 
 %% ===================================================================
 %% Creating links

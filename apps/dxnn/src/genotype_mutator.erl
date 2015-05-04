@@ -216,9 +216,84 @@ outsplice(AgentId, TimeProvider) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
 	NeuronIds = Cortex#cortex.neuron_ids,
-	NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
-	{{LayerIndex, _UniqueId}, neuron} = NeuronId.
+	FromNeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+	{{FromLayerIndex, _FromUID}, neuron} = FromNeuronId,
+	AvailableIds = case [{{TargetLayerIndex, TargetUID}, TargetType} || 
+		{{TargetLayerIndex, TargetUID}, TargetType}	<- NeuronIds, TargetLayerIndex > FromLayerIndex] of
+		[] ->
+			exit("******** ERROR: outsplice cannot outsplice after neuron ~p as there are no feed-forward output connections available",
+				[FromNeuronId]);
+		Ids ->
+			Ids
+	end,
+	ToNeuronId = lists:nth(random:uniform(length(AvailableIds)), AvailableIds),
+	{{ToLayerIndex, _ToUID}, _ToType} = ToNeuronId,
+	NewNeuronLayerIndex = get_new_layer_index(FromLayerIndex, ToLayerIndex, next, Pattern),
+	NewNeuronId = {{NewNeuronLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
+	SpeciesConstraint = Agent#agent.constraint,
+	genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
+	cut_link_between_elements(AgentId, FromNeuronId, ToNeuronId),
+	create_link_between_elements(AgentId, FromNeuronId, NewNeuronId),
+	create_link_between_elements(AgentId, NewNeuronId, ToNeuronId),
+	UpdatedPattern = case lists:keymember(NewNeuronId, 1, Pattern) of
+		true ->
+			{NewNeuronLayerIndex, IdsInLayer} = lists:keyfind(NewNeuronLayerIndex, 1, Pattern),
+			lists:keyreplace(NewNeuronLayerIndex, 1, Pattern, {NewNeuronLayerIndex, [NewNeuronId|IdsInLayer]});
+		false ->
+			lists:sort([{NewNeuronLayerIndex, [NewNeuronId]}|Pattern])
+	end,
+	UpdatedAgent = Agent#agent{
+		pattern = UpdatedPattern,
+		evo_hist = [{outsplice, FromNeuronId, NewNeuronId, ToNeuronId}|Agent#agent.evo_hist]
+	},
+	UpdatedCortex = Cortex#cortex{
+		neuron_ids = [NewNeuronId|Cortex#cortex.neuron_ids]
+	},	
+	genotype:write(UpdatedCortex),
+	genotype:write(UpdatedAgent).
+
+get_new_layer_index(LayerIndex, LayerIndex, _Direction, _Pattern) ->
+	exit("******** ERROR: get_new_layer_index: both neurons have the same layer index: ~p", [LayerIndex]);
+get_new_layer_index(FromLayerIndex, ToLayerIndex, Direction, Pattern) ->
+	NewLayerIndex = case Direction of
+		next -> 
+			get_next_layer_index(Pattern, FromLayerIndex, ToLayerIndex);
+		prev ->
+			get_previous_layer_index(lists:reverse(Pattern), FromLayerIndex, ToLayerIndex)
+	end,
+	NewLayerIndex.
+
+get_next_layer_index([{FromLayerIndex, _LayerNeuronIds}], FromLayerIndex, ToLayerIndex) ->
+	(FromLayerIndex + ToLayerIndex) / 2;
+get_next_layer_index([{LayerIndex, _LayerNeuronIds}|Pattern], FromLayerIndex, ToLayerIndex) ->
+	case LayerIndex == FromLayerIndex of
+		true ->
+			[{NextLayerIndex, _NextLayerNeuronIds}|_] = Pattern,
+			case NextLayerIndex == ToLayerIndex of
+				true ->
+					(FromLayerIndex + ToLayerIndex) / 2;
+				false ->
+					NextLayerIndex
+			end;
+		false ->
+			get_next_layer_index(Pattern, FromLayerIndex, ToLayerIndex)
+	end.
 	
+get_previous_layer_index([{FromLayerIndex, _LayerNeuronIds}], FromLayerIndex, ToLayerIndex) ->
+	(FromLayerIndex + ToLayerIndex) / 2;
+get_previous_layer_index([{LayerIndex, _LayerNeuronIds}|Pattern], FromLayerIndex, ToLayerIndex) ->
+	case LayerIndex == FromLayerIndex of
+		true ->
+			[{PreviousLayerIndex, _PreviousLayerNeuronIds}|_] = Pattern,
+			case PreviousLayerIndex == ToLayerIndex of
+				true ->
+					(FromLayerIndex + ToLayerIndex) / 2;
+				false ->
+					PreviousLayerIndex
+			end;
+		false ->
+			get_previous_layer_index(Pattern, FromLayerIndex, ToLayerIndex)
+	end.
 
 select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,
