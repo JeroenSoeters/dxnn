@@ -25,6 +25,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_sensorlink_test_/1,
 	  fun ?MODULE:add_actuatorlink_test_/1,
 	  fun ?MODULE:add_neuron_test_/1,
+	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -249,7 +250,6 @@ add_neuron_test_(_) ->
 	{LayerIndex, NeuronsInLayer} =  lists:keyfind(LayerIndex, 1, Agent#agent.pattern),
 	[LastMutation|_] = Agent#agent.evo_hist,
 	Cortex = find_cortex(?CORTEX),
-	
 
 	[?_assertNot(NewNeuron == undefined),
 	 ?_assert(lists:keymember(?A, 1, NewNeuron#neuron.input_ids_plus_weights)),
@@ -258,6 +258,9 @@ add_neuron_test_(_) ->
 	 ?_assert(lists:member(NewNeuronId, Cortex#cortex.neuron_ids)),
 	 ?_assertEqual({add_neuron, ?A, NewNeuronId, ?C}, LastMutation)].
 
+outsplice_test_(_) ->
+	?_assert(true).
+	
 %% ===================================================================
 %% Creating links
 %% ===================================================================
