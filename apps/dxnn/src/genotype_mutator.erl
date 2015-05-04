@@ -209,6 +209,17 @@ add_neuron(AgentId, TimeProvider) ->
 		evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
 	}).	
 
+outsplice(AgentId, TimeProvider) ->
+	Agent = genotype:read({agent, AgentId}),
+	Generation = Agent#agent.generation,
+	Pattern = Agent#agent.pattern,
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	NeuronIds = Cortex#cortex.neuron_ids,
+	NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+	{{LayerIndex, _UniqueId}, neuron} = NeuronId.
+	
+
 select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),

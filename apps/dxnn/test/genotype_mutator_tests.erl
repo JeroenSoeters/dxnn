@@ -25,7 +25,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_sensorlink_test_/1,
 	  fun ?MODULE:add_actuatorlink_test_/1,
 	  fun ?MODULE:add_neuron_test_/1,
-	  fun ?MODULE:outsplice_test_/1,
+%	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -259,8 +259,19 @@ add_neuron_test_(_) ->
 	 ?_assertEqual({add_neuron, ?A, NewNeuronId, ?C}, LastMutation)].
 
 outsplice_test_(_) ->
-	?_assert(true).
+	NewNeuronId = {{0.25, 80.0}, neuron},
+
+	meck:sequence(random, uniform, 1, [3, 1, 1]),
 	
+	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
+
+	in_transaction(fun() -> genotype:outsplice(?AGENT, FakeTimeProvider) end),
+
+	NeuronC = find_neuron(?C),
+	NeuronD = find_neuron(?D),
+
+	[?_assert(lists:member(NewNeuronId, NeuronC#neuron.output_ids))].
+
 %% ===================================================================
 %% Creating links
 %% ===================================================================
