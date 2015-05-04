@@ -3,6 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/records.hrl").
 -define(AGENT, test_agent).
+-define(CORTEX, {{origin,10},cortex}). 
 -define(SENSOR, {{-1, 20}, sensor}).
 -define(ACTUATOR, {{1, 30}, actuator}).
 -define(A, {{-0.5, 40}, neuron}).
@@ -23,6 +24,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_inlink_from_neuron_test_/1,
 	  fun ?MODULE:add_sensorlink_test_/1,
 	  fun ?MODULE:add_actuatorlink_test_/1,
+	  fun ?MODULE:add_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -220,6 +222,42 @@ add_actuatorlink_test_(_) ->
 	 ?_assert(lists:member(?A, Actuator#actuator.fanin_ids)),
 	 ?_assertEqual({add_actuatorlink, ?A, ?ACTUATOR}, LastMutation)].
 
+add_neuron_test_(_) ->
+	LayerIndex = 0.5,
+	Id = 80.0,
+	NewNeuronId = {{LayerIndex, Id}, neuron},
+
+	% The sequence of calls to random:uniform is as follows, the first call is to
+	% select the layer where the new neuron will be added. We select the third (0.5).
+	% The second call is construct_neuron selecting an activation function, we return the first.
+	% The third call will be to select the presynaptic element from the available
+	% sensors and neurons [sensor, a, b, c, d]. We return 2 (neuron a) and the last call will select
+	% the postsynaptic element, for which we return 3 (neuron c).
+	meck:sequence(random, uniform, 1, [3, 1, 2, 3]),
+	% The first call to random:uniform/0 is made by generate_id to create a unique id
+	% for the newly created neuron. The other calls are for pre- and postsynaptic weights.
+	meck:sequence(random, uniform, 0, [0.6, 0.6]),
+
+	% Will result in a generated unique id of 80
+	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
+
+	in_transaction(fun() -> genotype_mutator:add_neuron(?AGENT, FakeTimeProvider) end),
+	
+	NewNeuron = find_neuron(NewNeuronId),
+
+	Agent = find_agent(?AGENT),
+	{LayerIndex, NeuronsInLayer} =  lists:keyfind(LayerIndex, 1, Agent#agent.pattern),
+	[LastMutation|_] = Agent#agent.evo_hist,
+	Cortex = find_cortex(?CORTEX),
+	
+
+	[?_assertNot(NewNeuron == undefined),
+	 ?_assert(lists:keymember(?A, 1, NewNeuron#neuron.input_ids_plus_weights)),
+	 ?_assert(lists:member(?C, NewNeuron#neuron.output_ids)),
+	 ?_assert(lists:member(NewNeuronId, NeuronsInLayer)),
+	 ?_assert(lists:member(NewNeuronId, Cortex#cortex.neuron_ids)),
+	 ?_assertEqual({add_neuron, ?A, NewNeuronId, ?C}, LastMutation)].
+
 %% ===================================================================
 %% Creating links
 %% ===================================================================
@@ -307,6 +345,9 @@ find_actuator(ActuatorId) ->
 find_agent(AgentId) ->
 	find_node(agent, AgentId).
 
+find_cortex(CortexId) ->
+	find_node(cortex, CortexId).
+
 find_node(NodeType, NodeId) ->
 	F = fun() ->
 		genotype:read({NodeType, NodeId})
@@ -343,7 +384,7 @@ create_test_genotype() ->
 		     evo_hist = [],
 			 fitness = undefined,
 			 innovation_factor = undefined,
-		     pattern = [{0,[?A,?B,?C,?D]}]},
+		     pattern = [{-0.5, [?A]}, {0, [?B,?C]}, {0.5, [?D]}]},
 	 #cortex{
 	 	id = {{origin,10},cortex},
 		agent_id = ?AGENT,

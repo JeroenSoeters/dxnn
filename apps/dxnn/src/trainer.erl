@@ -24,7 +24,7 @@ loop(Morphology, _HiddenLayerDensities, FT, {AttemptAcc, MA}, {EvalAcc, EL}, {Be
 			Pid ! {self(), BestFitness, EvalAcc, CAcc, TAcc}
 	end;
 loop(Morphology, HiddenLayerDensities, FT, {AttemptAcc, MA}, {EvalAcc, EvalLimit}, {BestFitness, BestG}, ExpG, CAcc, TAcc) ->
-	genotype:construct(ExpG, Morphology, HiddenLayerDensities),
+	genotype:construct(ExpG, Morphology, HiddenLayerDensities, fun() -> now() end),
 	Agent_Pid = exoself:map(ExpG),
 	receive
 		{Agent_Pid, Fitness, Evals, Cycles, Time} ->

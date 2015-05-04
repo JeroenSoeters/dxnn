@@ -1,5 +1,6 @@
 -module(genotype_mutator).
 -include("records.hrl").
+-include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 -define(DELTA_MULTIPLIER, math:pi()*2).
 -define(SAT_LIMIT, math:pi()*2).
@@ -180,6 +181,33 @@ add_actuatorlink(AgentId) ->
 			},
 			genotype:write(UpdatedAgent)
 	end.
+
+add_neuron(AgentId, TimeProvider) ->
+	Agent = genotype:read({agent, AgentId}),
+	Generation = Agent#agent.generation,
+	Pattern = Agent#agent.pattern,
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	NeuronIds = Cortex#cortex.neuron_ids,
+	ActuatorIds = Cortex#cortex.actuator_ids,
+	SensorIds = Cortex#cortex.sensor_ids,
+	{TargetLayerIndex, TargetLayerNeuronIds} = lists:nth(random:uniform(length(Pattern)), Pattern),
+	NewNeuronId = {{TargetLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
+	UpdatedPattern = lists:keyreplace(TargetLayerIndex, 1, Agent#agent.pattern, 
+		{TargetLayerIndex, [NewNeuronId|TargetLayerNeuronIds]}),
+	SpeciesConstraint = Agent#agent.constraint,
+	genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
+	AvailableFromElements = SensorIds ++ NeuronIds,
+	AvailableToElements = NeuronIds ++ ActuatorIds,
+	FromElement = lists:nth(random:uniform(length(AvailableFromElements)), AvailableFromElements),
+	ToElement = lists:nth(random:uniform(length(AvailableToElements)), AvailableToElements),
+	create_link_between_elements(AgentId, FromElement, NewNeuronId),
+	create_link_between_elements(AgentId, NewNeuronId, ToElement),
+	genotype:write(Cortex#cortex{ neuron_ids = [NewNeuronId|NeuronIds] }),
+	genotype:write(Agent#agent{
+		pattern = UpdatedPattern,
+		evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
+	}).	
 
 select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,

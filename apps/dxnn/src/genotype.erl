@@ -3,10 +3,10 @@
 -include("records.hrl").
 
 %% doc The population montitor should have all the information with regards to the morphologies and species constraints under which the agent's genotype should be created. Thus construct_agent/3 is ran with the parameter SpeciesId to which this NN based system will belong, the AgentId that this NN based intelligent agent will have and the SpeciesConstraint that will define the list of activation functions and other parameters from which the seed agent can choose its parameters. In this function, first the generation is set to 0, since the agent is just created, then construct_cortex/3 is invoked, which creates the NN and returns itss CortexId. Ince the NN is created and the cortex's id is returned, we can fill out the information needed by the agent record and write it to the mnesia database.
-construct_agent(SpeciesId, AgentId, SpeciesConstraint) ->
+construct_agent(SpeciesId, AgentId, SpeciesConstraint, TimeProvider) ->
 	random:seed(now()),
 	Generation = 0,
-	{CortexId, Pattern} = construct_cortex(AgentId, Generation, SpeciesConstraint),
+	{CortexId, Pattern} = construct_cortex(AgentId, Generation, SpeciesConstraint, TimeProvider),
 	Agent = #agent{
 		id = AgentId,
 		cortex_id = CortexId,
@@ -20,15 +20,15 @@ construct_agent(SpeciesId, AgentId, SpeciesConstraint) ->
 	update_fingerprint(AgentId).	 
 	 
 %% doc Generates a new CortexId, extracts tje morphology form the constraints record passed to it in SpeciesConstraints and then extracts the initial sensors and actuators from the morphology. After the sensors and actuators are extracted, the function calls construct_initial_neuro_layer/5, which creates a single layer of neurons connected from the specified sensors and to the specified actuators and then returns the ids of the created neurons. Finally the sensor and actuator ids are extracted and the cortex record is composed and written to the database.
-construct_cortex(AgentId, Generation, SpeciesConstraint) ->
-	CortexId = {{origin, generate_unique_id()}, cortex},
+construct_cortex(AgentId, Generation, SpeciesConstraint, TimeProvider) ->
+	CortexId = {{origin, generate_unique_id(TimeProvider)}, cortex},
 	Morphology = SpeciesConstraint#constraint.morphology,
-	Sensors = [Sensor#sensor{id={{-1, generate_unique_id()}, sensor}, 
+	Sensors = [Sensor#sensor{id={{-1, generate_unique_id(TimeProvider)}, sensor}, 
 		cortex_id=CortexId} || Sensor <- morphology:get_init_sensors(Morphology)],
-	Actuators = [Actuator#actuator{id={{1, generate_unique_id()}, actuator}, 
+	Actuators = [Actuator#actuator{id={{1, generate_unique_id(TimeProvider)}, actuator}, 
 		cortex_id=CortexId} || Actuator <- morphology:get_init_actuators(Morphology)],
 	NeuronIds = construct_initial_neuro_layer(CortexId, Generation, 
-		SpeciesConstraint, Sensors, Actuators),
+		SpeciesConstraint, Sensors, Actuators, TimeProvider),
 	SensorIds = [Sensor#sensor.id || Sensor <- Sensors],
 	ActuatorIds = [Actuator#actuator.id || Actuator <- Actuators],
 	Cortex = #cortex{
@@ -42,17 +42,17 @@ construct_cortex(AgentId, Generation, SpeciesConstraint) ->
 	{CortexId, [{0, NeuronIds}]}.
 
 %% doc Creates a set of neurons for each actuator in the actuator list. The neurons are initialized in construct_initial_neurons/6 where they are connected to the actuator, and from a random subset of the sensors passed tp the function. construct_initial_neurons/6 returns the updated sensors. The actuator's fanin_ids is then updated to include the neuron ids that where connected to it. Once all the actuators have been connected, the sensors and actuators are written to the database and the set of newly created neuron ids is returned to the caller.
-construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators) ->
-	construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, [], []).
+construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, TimeProvider) ->
+	construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, TimeProvider, [], []).
 construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint,Sensors, 
-	[Actuator|Actuators], ActuatorsAcc, NeuronIdsAcc) ->
-		NeuronIds = [{{0, Id}, neuron} || Id <- generate_unique_ids(Actuator#actuator.vl)],
+	[Actuator|Actuators], TimeProvider, ActuatorsAcc, NeuronIdsAcc) ->
+		NeuronIds = [{{0, Id}, neuron} || Id <- generate_unique_ids(Actuator#actuator.vl, TimeProvider)],
 		UpdatedSensors = construct_initial_neurons(CortexId, Generation, SpeciesConstraint, NeuronIds, 
 			Sensors, Actuator),
 		UpdatedActuator = Actuator#actuator{fanin_ids=NeuronIds},
 		construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, UpdatedSensors, Actuators, 
-			[UpdatedActuator|ActuatorsAcc], lists:append(NeuronIds, NeuronIdsAcc));
-construct_initial_neuro_layer(_CortexId, _Generation, _SpeciesConstraint, Sensors, [], 
+			TimeProvider, [UpdatedActuator|ActuatorsAcc], lists:append(NeuronIds, NeuronIdsAcc));
+construct_initial_neuro_layer(_CortexId, _Generation, _SpeciesConstraint, Sensors, [], _TimeProvider,
 	ActuatorsAcc, NeuronIdsAcc) ->
 		[write(Sensor) || Sensor <- Sensors],
 		[write(Actuator) || Actuator <- ActuatorsAcc],
@@ -117,7 +117,9 @@ generate_activation_function(ActivationFunctions) ->
 	end.
 
 calculate_recursive_output_ids(SelfId, [OutputId|OutputIds]) ->
-	calculate_recursive_output_ids(SelfId, [OutputId|OutputIds], []).
+	calculate_recursive_output_ids(SelfId, [OutputId|OutputIds], []);
+calculate_recursive_output_ids(_SelfId, []) ->
+	[].
 calculate_recursive_output_ids(SelfId, [OutputId|OutputIds], Acc) ->
 	case OutputId of
 		{_, actuator} ->
@@ -208,17 +210,17 @@ delete_agent(AgentId, safe) ->
 	io:format("delete_agent(AgentId, safe):~p Result:~p~n", [AgentId, Result]).
 
 %% doc accepts an AgentId and CloneId as parameters and then clones the agent. The function first creates an ETS table to which it writes the ids of all the elements of the genotype and their correspondingly generated clone ids. Once all ids an clone ids have been generated, the function begins to clone the actual elements. clone_agent/2 first clones neurons, then sensors and finally the actuators. Once these elements are cloned, the function writes to the database the cloned versions oft he cortex and the agent,
-clone_agent(AgentId, CloneId) ->
+clone_agent(AgentId, CloneId, TimeProvider) ->
 	F = fun() ->
 		Agent = read({agent, AgentId}),
 		Cortex = read({cortex, Agent#agent.cortex_id}),
 		IdsAndCloneIds = ets:new(idsAndCloneIds, [set, private]),
 		ets:insert(IdsAndCloneIds, {threshold, threshold}),
 		ets:insert(IdsAndCloneIds, {AgentId, CloneId}),
-		[CloneCortexId] = map_ids(IdsAndCloneIds, [Agent#agent.cortex_id]),
-		CloneSensorIds = map_ids(IdsAndCloneIds, Cortex#cortex.sensor_ids),
-		CloneNeuronIds = map_ids(IdsAndCloneIds, Cortex#cortex.neuron_ids),
-		CloneActuatorIds = map_ids(IdsAndCloneIds, Cortex#cortex.actuator_ids),
+		[CloneCortexId] = map_ids(IdsAndCloneIds, [Agent#agent.cortex_id], TimeProvider),
+		CloneSensorIds = map_ids(IdsAndCloneIds, Cortex#cortex.sensor_ids, TimeProvider),
+		CloneNeuronIds = map_ids(IdsAndCloneIds, Cortex#cortex.neuron_ids, TimeProvider),
+		CloneActuatorIds = map_ids(IdsAndCloneIds, Cortex#cortex.actuator_ids, TimeProvider),
 		clone_neurons(IdsAndCloneIds, Cortex#cortex.neuron_ids),
 		clone_sensors(IdsAndCloneIds, Cortex#cortex.sensor_ids),
 		clone_actuators(IdsAndCloneIds, Cortex#cortex.actuator_ids),
@@ -238,18 +240,18 @@ clone_agent(AgentId, CloneId) ->
 	end,
 	mnesia:transaction(F).
 
-map_ids(IdsAndCloneIds, Ids) ->
-	map_ids(IdsAndCloneIds, Ids, []).
-map_ids(IdsAndCloneIds, [Id|Ids], Acc) ->
+map_ids(IdsAndCloneIds, Ids, TimeProvider) ->
+	map_ids(IdsAndCloneIds, Ids, TimeProvider, []).
+map_ids(IdsAndCloneIds, [Id|Ids], TimeProvider, Acc) ->
 	CloneId = case Id of
 		{{LayerIndex, _}, NodeType} -> % maps neuron ids and cortex ids
-			{{LayerIndex, generate_unique_id()}, NodeType}; 
+			{{LayerIndex, generate_unique_id(TimeProvider)}, NodeType}; 
 		{_, NodeType} -> % maps sensors and actuators
-			{generate_unique_id(), NodeType}
+			{generate_unique_id(TimeProvider), NodeType}
 	end,
 	ets:insert(IdsAndCloneIds, {Id, CloneId}),
-	map_ids(IdsAndCloneIds, Ids, [CloneId|Acc]);
-map_ids(_IdsAndCloneIds, [], Acc) ->
+	map_ids(IdsAndCloneIds, Ids, TimeProvider, [CloneId|Acc]);
+map_ids(_IdsAndCloneIds, [], _TimeProvider, Acc) ->
 	lists:reverse(Acc).
 
 %% doc accepts as the input the name of the ets table and the list of sensor ids. It then goes throught all the ids, reads the sensor from the database and updates all its ids from their original values to their clone values stored in the ets table. Afterwards the new version of the sensor is written to the database, effectively cloning the original sernsor.
@@ -336,9 +338,9 @@ print(AgentId) ->
 	[io:format("~p~n", [Neuron]) || Neuron <- Neurons],
 	[io:format("~p~n", [Actuator]) || Actuator <- Actuators].
 
-construct(Morphology, HiddenLayerDensities) ->
-	construct(ffnn, Morphology, HiddenLayerDensities).
-construct(FileName, Morphology, HiddenLayerDensities) ->
+construct(Morphology, HiddenLayerDensities, TimeProvider) ->
+	construct(ffnn, Morphology, HiddenLayerDensities, TimeProvider).
+construct(FileName, Morphology, HiddenLayerDensities, TimeProvider) ->
 	{V1, V2, V3} = now(),
 	random:seed(V1, V2, V3),
 	[S] = morphology:get_init_sensors(Morphology),
@@ -347,7 +349,7 @@ construct(FileName, Morphology, HiddenLayerDensities) ->
 	LayerDensities = lists:append(HiddenLayerDensities,[Output_VL]),
 	Cx_Id = cortex,
 
-	Neurons = create_NeuroLayers(Cx_Id,S,A,LayerDensities),
+	Neurons = create_NeuroLayers(Cx_Id,S,A,LayerDensities, TimeProvider),
 	[InputLayer|_] = Neurons,
 	[OutputLayer|_] = lists:reverse(Neurons),
 	FL_NIds = [N#neuron.id || N <- InputLayer],
@@ -362,37 +364,37 @@ construct(FileName, Morphology, HiddenLayerDensities) ->
 
 %The construct_Genotype function accepts the name of the file to which we'll save the genotype, sensor name, actuator name and the hidden layer density parameters. We haev to generate unique Ids for every sensor and actuator. The sensor and actuator names are used as input to the create_Sensor and create_Actuator functions, which in turn generate the actual Sensor and Actuator representing tuples. We create unique Ids for sensors and actuators so that when in the future a NN uses 2 or more sensors or actuators of the same type, we will be able to differentiate between them using their Ids. After the Sensor and Actuator tuples are generated, we extract the NN's input and output vector lenghts from the sensor and actuator used by the system. The Input_VL is then used to specify how many weights the neurons in the input layer will need, and the Output_VL specifies how many neurons are in the output layer of the NN. After appending the HiddenLayerDensities to the now known number of neurons in the last layer to generate the fill LayerDensities list, we use the create_NeuroLayers function to generate the Neuron representing tuples. We then update the Sensor and Actuator records with proper fanin and fanout ids from the freshly created Neuron tuples, compose the Cortex, and write the genotype to file.
 
-	create_Sensor(SensorName) ->
+	create_Sensor(SensorName, TimeProvider) ->
 		case SensorName of
 			rng ->
-				#sensor{id={sensor,generate_id()},name=rng,vl=2};
+				#sensor{id={sensor,generate_id(TimeProvider)},name=rng,vl=2};
 			_ ->
 				exit("System does not yet support a sensor by the name:~p",[SensorName])
 		end.
 
-	create_Actuator(ActuatorName) ->
+	create_Actuator(ActuatorName, TimeProvider) ->
 		case ActuatorName of
 			pts ->
-				#actuator{id={actuator,generate_id()},name=pts,vl=1};
+				#actuator{id={actuator,generate_id(TimeProvider)},name=pts,vl=1};
 			_ ->
 				exit("System does not yest support and actuator by the name:~p",[ActuatorName])
 		end.
 %Every sensor and actuator uses some kind of function associated with it, a function that either polls the environment for sensory signals (in the case of a sensor) or acts upon the environment (in the case of an actuator). It is the function that we need to define and program before it is used, and the name of the function is the same as the name of the sensor or actuator itself. For example, the create_Sensor/1 has specified only the rng sensor because that is the only sensor function we've finished developing. The rng function has it's on vl specification, whilc will determine the number of weights that a neuron will need to allocatie if it is to accept this sensor's output vector. The same principples apply to the create_Actuator function. Both, create_Sensor and create_Actuator function, given the name of the sensor or actuator, will return a record with all the specifications of that element, each with its own unique Id.
 
-	create_NeuroLayers(Cx_Id,Sensor,Actuator,LayerDensities) ->
+	create_NeuroLayers(Cx_Id,Sensor,Actuator,LayerDensities, TimeProvider) ->
 		Input_IdPs = [{Sensor#sensor.id,Sensor#sensor.vl}],
 		Tot_Layers = length(LayerDensities),
 		[FL_Neurons|Next_LDs] = LayerDensities,
-		NIds = [{neuron, {1,Id}} || Id <- generate_ids(FL_Neurons,[])],
-		create_NeuroLayers(Cx_Id,Actuator#actuator.id,1,Tot_Layers,Input_IdPs,NIds,Next_LDs,[]).
+		NIds = [{neuron, {1,Id}} || Id <- generate_ids(FL_Neurons,TimeProvider,[])],
+		create_NeuroLayers(Cx_Id,Actuator#actuator.id,1,Tot_Layers,Input_IdPs,NIds,Next_LDs,TimeProvider,[]).
 %The function create_NeuroLayers/4 preoares the initial step before starting the recursive create_NeuroLayers/7 function which will create all the Neuron records. We first generate the place holder Input Ids "Plus" (Input_IdPs), which are tuples composed of the Ids and the vector lengths of the incoming signals associated with them. The proper input_idps will have a weight list in the tuple instead of the vector length. Because we are only building the NNs each with only a single Sensor and Actuator, the IdP to the first layer is composed of the single Sensor Id with the vector lenght of its sensory signal, likewise in the case of the Actuator. We then generate unique ids for the neurons in the first layer, and drop into the recursive create_NeuroLayers/7 function.
 
-	create_NeuroLayers(Cx_Id,Actuator_Id,LayerIndex,Tot_Layers,Input_IdPs,NIds,[Next_LD|LDs],Acc) ->
-		Output_NIds = [{neuron,{LayerIndex+1,Id}} || Id <- generate_ids(Next_LD,[])],
+	create_NeuroLayers(Cx_Id,Actuator_Id,LayerIndex,Tot_Layers,Input_IdPs,NIds,[Next_LD|LDs],TimeProvider,Acc) ->
+		Output_NIds = [{neuron,{LayerIndex+1,Id}} || Id <- generate_ids(Next_LD,TimeProvider,[])],
 		Layer_Neurons = create_NeuroLayer(Cx_Id,Input_IdPs,NIds,Output_NIds,[]),
 		Next_InputIdPs = [{NId,1} || NId <- NIds],
-		create_NeuroLayers(Cx_Id,Actuator_Id,LayerIndex+1,Tot_Layers,Next_InputIdPs,Output_NIds,LDs,[Layer_Neurons|Acc]);
-	create_NeuroLayers(Cx_Id,Actuator_Id,Tot_Layers,Tot_Layers,Input_IdPs,NIds,[],Acc) ->
+		create_NeuroLayers(Cx_Id,Actuator_Id,LayerIndex+1,Tot_Layers,Next_InputIdPs,Output_NIds,LDs,TimeProvider,[Layer_Neurons|Acc]);
+	create_NeuroLayers(Cx_Id,Actuator_Id,Tot_Layers,Tot_Layers,Input_IdPs,NIds,[],_TimeProvider,Acc) ->
 		Output_Ids = [Actuator_Id],
 		Layer_Neurons = create_NeuroLayer(Cx_Id,Input_IdPs,NIds,Output_Ids,[]),
 		lists:reverse([Layer_Neurons|Acc]).
@@ -422,24 +424,24 @@ construct(FileName, Morphology, HiddenLayerDensities) ->
 		create_NeuralWeights(Index-1,[W|Acc]).
 %Each neuron record is composed by the create_Neuron/4 function. The create_Neuron/4 function creates the Input list from the tuples [{Id,Weights}...] using the vector lengths specified in the place holder Input_IdPs. The create_NeuralInput/2 function then uses create_NeuralWeights/2 to generate the random weights in the range of -0.5 ro 0.5, adding the bias to the end of the list.
 
-	generate_unique_ids(N) ->
-		generate_unique_ids(N, []).
-	generate_unique_ids(0, Acc) ->
+	generate_unique_ids(N, TimeProvider) ->
+		generate_unique_ids(N, TimeProvider, []).
+	generate_unique_ids(0, _TimeProvider, Acc) ->
 		lists:reverse(Acc);
-	generate_unique_ids(N, Acc) ->
-		generate_unique_ids(N-1, [generate_unique_id()|Acc]).
+	generate_unique_ids(N, TimeProvider, Acc) ->
+		generate_unique_ids(N-1, TimeProvider, [generate_unique_id(TimeProvider)|Acc]).
 
-	generate_unique_id() ->
-		generate_id(). % no clue why this needs to be renamed.. going with the flow..
+	generate_unique_id(TimeProvider) ->
+		generate_id(TimeProvider). % no clue why this needs to be renamed.. going with the flow..
 
-	generate_ids(0,Acc) ->
+	generate_ids(0,_TimeProvider, Acc) ->
 		Acc;
-	generate_ids(Index,Acc) ->
-		Id = generate_id(),
-		generate_ids(Index-1,[Id|Acc]).
+	generate_ids(Index,TimeProvider, Acc) ->
+		Id = generate_id(TimeProvider),
+		generate_ids(Index-1,TimeProvider,[Id|Acc]).
 
-	generate_id() ->
-		{MegaSeconds,Seconds,MicroSeconds} = now(),
+	generate_id(TimeProvider) ->
+		{MegaSeconds,Seconds,MicroSeconds} = TimeProvider(),
 		1/(MegaSeconds*1000000 + Seconds + MicroSeconds/1000000).
 %The generate_id()/0 creates a unique id using current time, the Id is a floating point value The generate_ids/2 function creates a list of unique Ids.
 
@@ -490,8 +492,8 @@ test_x() ->
 	CloneAgentId = test_clone,
 	SpeciesConstraint = #constraint{},
 	F = fun() ->
-		construct_agent(AgentId, SpecieId, SpeciesConstraint),
-		clone_agent(SpecieId, CloneAgentId),
+		construct_agent(AgentId, SpecieId, SpeciesConstraint, fun() -> now() end),
+		clone_agent(SpecieId, CloneAgentId, fun() -> now() end),
 		print(AgentId),
 		print(CloneAgentId),
 		delete_agent(AgentId),
@@ -506,11 +508,11 @@ create_test_x() ->
 	F = fun() ->
 		case read({agent, test}) of
 			undefined ->
-				construct_agent(SpecieId, AgentId, SpeciesConstraint),
+				construct_agent(SpecieId, AgentId, SpeciesConstraint, fun() -> now() end),
 				print(AgentId);
 			_ ->
 				delete_agent(AgentId),
-				construct_agent(SpecieId, AgentId, SpeciesConstraint),
+				construct_agent(SpecieId, AgentId, SpeciesConstraint, fun() -> now() end),
 				print(AgentId)
 			end
 	end,
