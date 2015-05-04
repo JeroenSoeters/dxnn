@@ -38,6 +38,8 @@ genome_mutator_test_() ->
 %% ===================================================================
 
 setup() ->
+	email_address:is_valid("jsoeters@thoughtworks.com"),
+
 	case whereis(polis) of
 		undefined ->
 			mnesia:start(),
