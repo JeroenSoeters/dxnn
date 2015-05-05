@@ -172,7 +172,7 @@ add_actuatorlink(AgentId) ->
 	FaninIds = Actuator#actuator.fanin_ids,
 	case Cortex#cortex.neuron_ids -- FaninIds of
 		[] -> 
-			exit("******** ERROR: add_sensor cannot add inlink to sensor ~p as it is already connected to all neurons", [Actuator#actuator.id]);
+			exit("******** ERROR: add_actuator cannot add inlink to actuator ~p as it is already connected to all neurons", [Actuator#actuator.id]);
 		NeuronIds ->
 			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
 			create_link_between_elements(AgentId, NeuronId, ActuatorId),
@@ -295,6 +295,38 @@ get_previous_layer_index([{LayerIndex, _LayerNeuronIds}|Pattern], FromLayerIndex
 			get_previous_layer_index(Pattern, FromLayerIndex, ToLayerIndex)
 	end.
 
+add_sensor(AgentId, TimeProvider) ->
+	Agent = genotype:read({agent, AgentId}),
+	CortexId = Agent#agent.cortex_id,
+	Cortex = genotype:read({cortex, CortexId}),
+	SensorIds = Cortex#cortex.sensor_ids,
+	SpeciesConstraint = Agent#agent.constraint,
+	Morphology = SpeciesConstraint#constraint.morphology,
+	case morphology:get_sensors(Morphology) --
+		[(genotype:read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[]} 
+			|| SensorId <- SensorIds] of
+		[] ->
+			exit("******** ERROR: ad_sensor cannot add sensor as the NN is already using all available sensors");
+		AvailableSensors ->
+			NewSensorId = {{-1, genotype:generate_unique_id(TimeProvider)}, sensor},
+			NewSensor = (lists:nth(random:uniform(length(AvailableSensors)), AvailableSensors))#sensor{
+				id = NewSensorId,
+				cortex_id = CortexId
+			},
+			genotype:write(NewSensor),
+			NeuronIds = Cortex#cortex.neuron_ids,
+			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+			create_link_between_elements(AgentId, NewSensorId, NeuronId),
+			UpdatedCortex = Cortex#cortex{
+				sensor_ids = [NewSensorId|Cortex#cortex.sensor_ids]
+			},
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{add_sensor, NewSensorId, NeuronId}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedAgent),
+			genotype:write(UpdatedCortex)
+	end.
+	
 select_random_neuron(Agent) ->
 	CortexId = Agent#agent.cortex_id,
 	Cortex = genotype:read({cortex, CortexId}),
