@@ -315,8 +315,7 @@ add_sensor_test_(_) ->
 	 ?_assert(lists:keymember(NewSensorId, 1, NeuronC#neuron.input_ids_plus_weights)),
 	 ?_assert(lists:member(NewSensorId, Cortex#cortex.sensor_ids)),
 	 ?_assertEqual({add_sensor, NewSensorId, ?C}, LastMutation)].
-	% add cortex and agent tests here...
-	
+
 %% ===================================================================
 %% Creating links
 %% ===================================================================
@@ -431,15 +430,15 @@ create_test_genotype() ->
 			 fingerprint = {
 				[{0,1}],
 				[],
-				[{sensor,undefined,undefined,xor_get_input,
-					{private,xor_sim},
+				[{sensor,undefined,undefined,sensor1,
+					{private,test_sim},
 					2,
 					[?A, ?B]}],
-				[{actuator,undefined,undefined,xor_send_output,
-					{private,xor_sim},
+				[{actuator,undefined,undefined,actuator1,
+					{private,test_sim},
 					1,
 					[?D]}]},
-			 constraint = #constraint{morphology = xor_mimic, neural_afs = [tanh,cos,gauss,abs]},
+			 constraint = #constraint{morphology = test_morph, neural_afs = [tanh,cos,gauss,abs]},
 		     evo_hist = [],
 			 fitness = undefined,
 			 innovation_factor = undefined,
@@ -453,8 +452,8 @@ create_test_genotype() ->
 	#sensor{
 		id = ?SENSOR,
 		cortex_id = {{origin,10},cortex},
-		name = xor_get_input,
-		scape = {private,xor_sim},
+		name = sensor1,
+		scape = {private,test_sim},
 		vl = 2,
 		fanout_ids = [?A, ?B]},
 	#neuron{ % neuron A
@@ -498,7 +497,7 @@ create_test_genotype() ->
 	 #actuator{
 		id = ?ACTUATOR,
 		cortex_id = {{origin,10},cortex},
-		name = xor_send_output,
-		scape = {private,xor_sim},
+		name = actuator1,
+		scape = {private,test_sim},
 		vl = 2,
 		fanin_ids = [?D]}].
