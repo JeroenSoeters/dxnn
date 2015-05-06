@@ -1,4 +1,4 @@
--module(genotype_mutator).
+-module(genome_mutator).
 -include("records.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
@@ -56,9 +56,9 @@ apply_mutation_operator(AgentId) ->
 		io:format("Mutation Operator: ~p~n", [Mutator]),
 		case Args of
 			[] ->
-				genotype_mutator:Mutator(AgentId);
+				genome_mutator:Mutator(AgentId);
 			_ ->
-				(apply(genotype_mutator, Mutator, Args))(AgentId)
+				(apply(genome_mutator, Mutator, Args))(AgentId)
 		end
 	end,
 	mnesia:transaction(F).
@@ -643,9 +643,9 @@ test_x(AgentId, Mutator) ->
 		{M, Args} = lists:keyfind(Mutator, 1, ?MUTATORS),
 		case Args of
 			[] ->
-				genotype_mutator:M(AgentId);
+				genome_mutator:M(AgentId);
 			_ ->
-				(apply(genotype_mutator, M, Args))(AgentId)
+				(apply(genome_mutator, M, Args))(AgentId)
 		end
 	end,
 	mnesia:transaction(F).
