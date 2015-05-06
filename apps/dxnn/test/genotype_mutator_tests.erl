@@ -43,10 +43,7 @@ genome_mutator_test_() ->
 setup() ->
 	mnesia:delete_schema({node()}),
 	polis:start(),
-	F = fun() ->
-		[mnesia:write(R) || R <- create_test_genotype()]
-	end,
-	mnesia:transaction(F),
+	in_transaction(fun() ->	[mnesia:write(R) || R <- create_test_genotype()] end),
 	case whereis(random_meck) of
 		undefined ->
 			meck:new(random, [unstick]);
@@ -58,6 +55,9 @@ setup() ->
 teardown(_) ->
 	polis:stop(),
 	meck:unload(random).
+
+mutate_test_(_) ->
+	?_assert(false).
 
 %% ===================================================================
 %% Mutation operators
