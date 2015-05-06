@@ -41,8 +41,8 @@ test_morph(sensors) ->
 
 test_morph(actuators) ->
 	[
-		#sensor{name = actuator1, scape={private, test_sim}, vl = 2}
-%		#sensor{name = sensor2, scape={private, test_sim}, vl = 2},
+		#actuator{name = actuator1, scape={private, test_sim}, vl = 2},
+		#actuator{name = actuator2, scape={private, test_sim}, vl = 2}
 	].
 
 generate_id() ->

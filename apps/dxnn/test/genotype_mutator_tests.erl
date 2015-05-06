@@ -27,6 +27,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_neuron_test_/1,
 	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:add_sensor_test_/1,
+	  fun ?MODULE:add_actuator_test_/1,
 	  fun ?MODULE:create_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
@@ -315,6 +316,32 @@ add_sensor_test_(_) ->
 	 ?_assert(lists:keymember(NewSensorId, 1, NeuronC#neuron.input_ids_plus_weights)),
 	 ?_assert(lists:member(NewSensorId, Cortex#cortex.sensor_ids)),
 	 ?_assertEqual({add_sensor, NewSensorId, ?C}, LastMutation)].
+
+add_actuator_test_(_) ->
+	NewActuatorId = {{-1, 80.0}, actuator},
+	
+	% The first call to random:uniform/1 will be to select an actuator from the morphology,
+	% since there is only one unused actuator we return that one. The second call will be to
+	% select a neuron from the list, we will connect neuron c, which is under index 3.  
+	meck:sequence(random, uniform, 1, [1, 3]),
+	
+	meck:sequence(random, uniform, 0, [0.6, 0.6]),
+
+	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
+
+	in_transaction(fun() -> genotype_mutator:add_actuator(?AGENT, FakeTimeProvider) end),
+
+	NewActuator = find_actuator(NewActuatorId),
+	NeuronC = find_neuron(?C),
+	Cortex = find_cortex(?CORTEX),
+	Agent = find_agent(?AGENT),
+	[LastMutation|_] = Agent#agent.evo_hist,
+
+	[?_assertNot(NewActuator == undefined),
+	 ?_assert(lists:member(?C, NewActuator#actuator.fanin_ids)),
+	 ?_assert(lists:member(NewActuatorId, NeuronC#neuron.output_ids)),
+	 ?_assert(lists:member(NewActuatorId, Cortex#cortex.actuator_ids)),
+	 ?_assertEqual({add_actuator, NewActuatorId, ?C}, LastMutation)].
 
 %% ===================================================================
 %% Creating links
