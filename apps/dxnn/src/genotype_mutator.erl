@@ -4,6 +4,7 @@
 -compile(export_all).
 -define(DELTA_MULTIPLIER, math:pi()*2).
 -define(SAT_LIMIT, math:pi()*2).
+-define(TIME_PROVIDER, fun() -> now() end).
 -define(MUTATORS, [
 	{mutate_weights, []},
 	{add_bias, []},
@@ -12,10 +13,10 @@
 	{add_inlink, []},
 	{add_sensorlink, []},
 	{add_actuatorlink, []},
-	{add_neuron, [fun() -> now() end]},
-	{outsplice, [fun() -> now() end]},
-	{add_sensor, [fun() -> now() end]},
-	{add_actuator, [fun() -> now() end]}
+	{add_neuron, [?TIME_PROVIDER]},
+	{outsplice, [?TIME_PROVIDER]},
+	{add_sensor, [?TIME_PROVIDER]},
+	{add_actuator, [?TIME_PROVIDER]}
 ]).
 
 mutate(AgentId) ->
@@ -39,7 +40,6 @@ apply_mutation_operators(AgentId) ->
 apply_mutation_operators(_AgentId, 0) ->
 	done;
 apply_mutation_operators(AgentId, Index) ->
-	?debugFmt("~n~p~n", [Index]),
 	Result = apply_mutation_operator(AgentId),
 	case Result of
 		{atomic, _} ->
