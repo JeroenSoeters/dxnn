@@ -5,17 +5,17 @@
 -define(DELTA_MULTIPLIER, math:pi()*2).
 -define(SAT_LIMIT, math:pi()*2).
 -define(MUTATORS, [
-	mutate_weights,
-	add_bias,
-	remove_bias,
-	add_outlink,
-	add_inlink,
-	add_sensorlink,
-	add_actuatorlink,
-	add_neuron,
-	outsplice,
-	add_sensor,
-	add_actuator
+	{mutate_weights, []},
+	{add_bias, []},
+	{remove_bias, []},
+	{add_outlink, []},
+	{add_inlink, []},
+	{add_sensorlink, []},
+	{add_actuatorlink, []},
+	{add_neuron, [fun() -> now() end]},
+	{outsplice, [fun() -> now() end]},
+	{add_sensor, [fun() -> now() end]},
+	{add_actuator, [fun() -> now() end]}
 ]).
 
 mutate(AgentId) ->
@@ -52,9 +52,14 @@ apply_mutation_operators(AgentId, Index) ->
 apply_mutation_operator(AgentId) ->
 	F = fun() ->
 		Mutators = ?MUTATORS,
-		Mutator = lists:nth(random:uniform(length(Mutators)), Mutators),
+		{Mutator, Args} = lists:nth(random:uniform(length(Mutators)), Mutators),
 		io:format("Mutation Operator: ~p~n", [Mutator]),
-		genotype_mutator:Mutator(AgentId)
+		case Args of
+			[] ->
+				genotype_mutator:Mutator(AgentId);
+			_ ->
+				(apply(genotype_mutator, Mutator, Args))(AgentId)
+		end
 	end,
 	mnesia:transaction(F).
 
@@ -234,75 +239,80 @@ add_actuatorlink(AgentId) ->
 			genotype:write(UpdatedAgent)
 	end.
 
-add_neuron(AgentId, TimeProvider) ->
-	Agent = genotype:read({agent, AgentId}),
-	Generation = Agent#agent.generation,
-	Pattern = Agent#agent.pattern,
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	NeuronIds = Cortex#cortex.neuron_ids,
-	ActuatorIds = Cortex#cortex.actuator_ids,
-	SensorIds = Cortex#cortex.sensor_ids,
-	{TargetLayerIndex, TargetLayerNeuronIds} = lists:nth(random:uniform(length(Pattern)), Pattern),
-	NewNeuronId = {{TargetLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
-	UpdatedPattern = lists:keyreplace(TargetLayerIndex, 1, Agent#agent.pattern, 
-		{TargetLayerIndex, [NewNeuronId|TargetLayerNeuronIds]}),
-	SpeciesConstraint = Agent#agent.constraint,
-	genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
-	AvailableFromElements = SensorIds ++ NeuronIds,
-	AvailableToElements = NeuronIds ++ ActuatorIds,
-	FromElement = lists:nth(random:uniform(length(AvailableFromElements)), AvailableFromElements),
-	ToElement = lists:nth(random:uniform(length(AvailableToElements)), AvailableToElements),
-	create_link_between_elements(AgentId, FromElement, NewNeuronId),
-	create_link_between_elements(AgentId, NewNeuronId, ToElement),
-	genotype:write(Cortex#cortex{ neuron_ids = [NewNeuronId|NeuronIds] }),
-	genotype:write(Agent#agent{
-		pattern = UpdatedPattern,
-		evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
-	}).	
+add_neuron(TimeProvider) ->
+	fun(AgentId) ->
+		Agent = genotype:read({agent, AgentId}),
+		Generation = Agent#agent.generation,
+		Pattern = Agent#agent.pattern,
+		CortexId = Agent#agent.cortex_id,
+		Cortex = genotype:read({cortex, CortexId}),
+		NeuronIds = Cortex#cortex.neuron_ids,
+		ActuatorIds = Cortex#cortex.actuator_ids,
+		SensorIds = Cortex#cortex.sensor_ids,
+		{TargetLayerIndex, TargetLayerNeuronIds} = lists:nth(random:uniform(length(Pattern)), Pattern),
+		NewNeuronId = {{TargetLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
+		UpdatedPattern = lists:keyreplace(TargetLayerIndex, 1, Agent#agent.pattern, 
+			{TargetLayerIndex, [NewNeuronId|TargetLayerNeuronIds]}),
+		SpeciesConstraint = Agent#agent.constraint,
+		genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
+		AvailableFromElements = SensorIds ++ NeuronIds,
+		AvailableToElements = NeuronIds ++ ActuatorIds,
+		FromElement = lists:nth(random:uniform(length(AvailableFromElements)), AvailableFromElements),
+		ToElement = lists:nth(random:uniform(length(AvailableToElements)), AvailableToElements),
+		create_link_between_elements(AgentId, FromElement, NewNeuronId),
+		create_link_between_elements(AgentId, NewNeuronId, ToElement),
+		genotype:write(Cortex#cortex{ neuron_ids = [NewNeuronId|NeuronIds] }),
+		genotype:write(Agent#agent{
+			pattern = UpdatedPattern,
+			evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
+		})
+	end.
 
-outsplice(AgentId, TimeProvider) ->
-	Agent = genotype:read({agent, AgentId}),
-	Generation = Agent#agent.generation,
-	Pattern = Agent#agent.pattern,
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	NeuronIds = Cortex#cortex.neuron_ids,
-	FromNeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
-	{{FromLayerIndex, _FromUID}, neuron} = FromNeuronId,
-	AvailableIds = case [{{TargetLayerIndex, TargetUID}, TargetType} || 
-		{{TargetLayerIndex, TargetUID}, TargetType}	<- NeuronIds, TargetLayerIndex > FromLayerIndex] of
-		[] ->
-			exit("******** ERROR: outsplice cannot outsplice after neuron ~p as there are no feed-forward output connections available",
-				[FromNeuronId]);
-		Ids ->
-			Ids
-	end,
-	ToNeuronId = lists:nth(random:uniform(length(AvailableIds)), AvailableIds),
-	{{ToLayerIndex, _ToUID}, _ToType} = ToNeuronId,
-	NewNeuronLayerIndex = get_new_layer_index(FromLayerIndex, ToLayerIndex, next, Pattern),
-	NewNeuronId = {{NewNeuronLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
-	SpeciesConstraint = Agent#agent.constraint,
-	genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
-	cut_link_between_elements(AgentId, FromNeuronId, ToNeuronId),
-	create_link_between_elements(AgentId, FromNeuronId, NewNeuronId),
-	create_link_between_elements(AgentId, NewNeuronId, ToNeuronId),
-	UpdatedPattern = case lists:keymember(NewNeuronId, 1, Pattern) of
-		true ->
-			{NewNeuronLayerIndex, IdsInLayer} = lists:keyfind(NewNeuronLayerIndex, 1, Pattern),
-			lists:keyreplace(NewNeuronLayerIndex, 1, Pattern, {NewNeuronLayerIndex, [NewNeuronId|IdsInLayer]});
-		false ->
-			lists:sort([{NewNeuronLayerIndex, [NewNeuronId]}|Pattern])
-	end,
-	UpdatedAgent = Agent#agent{
-		pattern = UpdatedPattern,
-		evo_hist = [{outsplice, FromNeuronId, NewNeuronId, ToNeuronId}|Agent#agent.evo_hist]
-	},
-	UpdatedCortex = Cortex#cortex{
-		neuron_ids = [NewNeuronId|Cortex#cortex.neuron_ids]
-	},	
-	genotype:write(UpdatedCortex),
-	genotype:write(UpdatedAgent).
+outsplice(TimeProvider) ->
+	fun(AgentId) ->
+		Agent = genotype:read({agent, AgentId}),
+		Generation = Agent#agent.generation,
+		Pattern = Agent#agent.pattern,
+		CortexId = Agent#agent.cortex_id,
+		Cortex = genotype:read({cortex, CortexId}),
+		NeuronIds = Cortex#cortex.neuron_ids,
+		FromNeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+		Neuron = genotype:read({neuron, FromNeuronId}),
+		{{FromLayerIndex, _FromUID}, neuron} = FromNeuronId,
+		AvailableIds = case [{{TargetLayerIndex, TargetUID}, TargetType} || 
+			{{TargetLayerIndex, TargetUID}, TargetType}	<- Neuron#neuron.output_ids, TargetLayerIndex > FromLayerIndex] of
+			[] ->
+				exit("******** ERROR: outsplice cannot outsplice after neuron ~p as there are no feed-forward output connections available",
+					[FromNeuronId]);
+			Ids ->
+				Ids
+		end,
+		ToNeuronId = lists:nth(random:uniform(length(AvailableIds)), AvailableIds),
+		{{ToLayerIndex, _ToUID}, _ToType} = ToNeuronId,
+		NewNeuronLayerIndex = get_new_layer_index(FromLayerIndex, ToLayerIndex, next, Pattern),
+		NewNeuronId = {{NewNeuronLayerIndex, genotype:generate_unique_id(TimeProvider)}, neuron},
+		SpeciesConstraint = Agent#agent.constraint,
+		genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
+		cut_link_between_elements(AgentId, FromNeuronId, ToNeuronId),
+		create_link_between_elements(AgentId, FromNeuronId, NewNeuronId),
+		create_link_between_elements(AgentId, NewNeuronId, ToNeuronId),
+		UpdatedPattern = case lists:keymember(NewNeuronId, 1, Pattern) of
+			true ->
+				{NewNeuronLayerIndex, IdsInLayer} = lists:keyfind(NewNeuronLayerIndex, 1, Pattern),
+				lists:keyreplace(NewNeuronLayerIndex, 1, Pattern, {NewNeuronLayerIndex, [NewNeuronId|IdsInLayer]});
+			false ->
+				lists:sort([{NewNeuronLayerIndex, [NewNeuronId]}|Pattern])
+		end,
+		UpdatedAgent = Agent#agent{
+			pattern = UpdatedPattern,
+			evo_hist = [{outsplice, FromNeuronId, NewNeuronId, ToNeuronId}|Agent#agent.evo_hist]
+		},
+		UpdatedCortex = Cortex#cortex{
+			neuron_ids = [NewNeuronId|Cortex#cortex.neuron_ids]
+		},	
+		genotype:write(UpdatedCortex),
+		genotype:write(UpdatedAgent)
+	end.
 
 get_new_layer_index(LayerIndex, LayerIndex, _Direction, _Pattern) ->
 	exit("******** ERROR: get_new_layer_index: both neurons have the same layer index: ~p", [LayerIndex]);
@@ -347,68 +357,72 @@ get_previous_layer_index([{LayerIndex, _LayerNeuronIds}|Pattern], FromLayerIndex
 			get_previous_layer_index(Pattern, FromLayerIndex, ToLayerIndex)
 	end.
 
-add_sensor(AgentId, TimeProvider) ->
-	Agent = genotype:read({agent, AgentId}),
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	SensorIds = Cortex#cortex.sensor_ids,
-	SpeciesConstraint = Agent#agent.constraint,
-	Morphology = SpeciesConstraint#constraint.morphology,
-	case morphology:get_sensors(Morphology) --
-		[(genotype:read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[]} 
-			|| SensorId <- SensorIds] of
-		[] ->
-			exit("******** ERROR: add_sensor cannot add sensor as the NN is already using all available sensors");
-		AvailableSensors ->
-			NewSensorId = {{-1, genotype:generate_unique_id(TimeProvider)}, sensor},
-			NewSensor = (lists:nth(random:uniform(length(AvailableSensors)), AvailableSensors))#sensor{
-				id = NewSensorId,
-				cortex_id = CortexId
-			},
-			genotype:write(NewSensor),
-			NeuronIds = Cortex#cortex.neuron_ids,
-			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
-			create_link_between_elements(AgentId, NewSensorId, NeuronId),
-			UpdatedCortex = Cortex#cortex{
-				sensor_ids = [NewSensorId|Cortex#cortex.sensor_ids]
-			},
-			UpdatedAgent = Agent#agent{
-				evo_hist = [{add_sensor, NewSensorId, NeuronId}|Agent#agent.evo_hist]
-			},
-			genotype:write(UpdatedAgent),
-			genotype:write(UpdatedCortex)
+add_sensor(TimeProvider) ->
+	fun(AgentId) ->
+		Agent = genotype:read({agent, AgentId}),
+		CortexId = Agent#agent.cortex_id,
+		Cortex = genotype:read({cortex, CortexId}),
+		SensorIds = Cortex#cortex.sensor_ids,
+		SpeciesConstraint = Agent#agent.constraint,
+		Morphology = SpeciesConstraint#constraint.morphology,
+		case morphology:get_sensors(Morphology) --
+			[(genotype:read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[]} 
+				|| SensorId <- SensorIds] of
+			[] ->
+				exit("******** ERROR: add_sensor cannot add sensor as the NN is already using all available sensors");
+			AvailableSensors ->
+				NewSensorId = {{-1, genotype:generate_unique_id(TimeProvider)}, sensor},
+				NewSensor = (lists:nth(random:uniform(length(AvailableSensors)), AvailableSensors))#sensor{
+					id = NewSensorId,
+					cortex_id = CortexId
+				},
+				genotype:write(NewSensor),
+				NeuronIds = Cortex#cortex.neuron_ids,
+				NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+				create_link_between_elements(AgentId, NewSensorId, NeuronId),
+				UpdatedCortex = Cortex#cortex{
+					sensor_ids = [NewSensorId|Cortex#cortex.sensor_ids]
+				},
+				UpdatedAgent = Agent#agent{
+					evo_hist = [{add_sensor, NewSensorId, NeuronId}|Agent#agent.evo_hist]
+				},
+				genotype:write(UpdatedAgent),
+				genotype:write(UpdatedCortex)
+		end
 	end.
 	
-add_actuator(AgentId, TimeProvider) ->
-	Agent = genotype:read({agent, AgentId}),
-	CortexId = Agent#agent.cortex_id,
-	Cortex = genotype:read({cortex, CortexId}),
-	ActuatorIds = Cortex#cortex.actuator_ids,
-	SpeciesConstraint = Agent#agent.constraint,
-	Morphology = SpeciesConstraint#constraint.morphology,
-	case morphology:get_actuators(Morphology) --
-		[(genotype:read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined, fanin_ids=[]} 
-			|| ActuatorId <- ActuatorIds] of
-		[] ->
-			exit("******** ERROR: add_actuator cannot add actuator as the NN is already using all available actuators");
-		AvailableActuators ->
-			NewActuatorId = {{-1, genotype:generate_unique_id(TimeProvider)}, actuator},
-			NewActuator = (lists:nth(random:uniform(length(AvailableActuators)), AvailableActuators))#actuator{
-				id = NewActuatorId,
-				cortex_id = CortexId
-			},
-			genotype:write(NewActuator),
-			NeuronIds = Cortex#cortex.neuron_ids,
-			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
-			create_link_between_elements(AgentId, NeuronId, NewActuatorId),
-			UpdatedCortex = Cortex#cortex{
-				actuator_ids = [NewActuatorId|Cortex#cortex.actuator_ids]
-			},
-			UpdatedAgent = Agent#agent{
-				evo_hist = [{add_actuator, NewActuatorId, NeuronId}|Agent#agent.evo_hist]
-			},
-			genotype:write(UpdatedAgent),
-			genotype:write(UpdatedCortex)
+add_actuator(TimeProvider) ->
+	fun(AgentId) ->
+		Agent = genotype:read({agent, AgentId}),
+		CortexId = Agent#agent.cortex_id,
+		Cortex = genotype:read({cortex, CortexId}),
+		ActuatorIds = Cortex#cortex.actuator_ids,
+		SpeciesConstraint = Agent#agent.constraint,
+		Morphology = SpeciesConstraint#constraint.morphology,
+		case morphology:get_actuators(Morphology) --
+			[(genotype:read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined, fanin_ids=[]} 
+				|| ActuatorId <- ActuatorIds] of
+			[] ->
+				exit("******** ERROR: add_actuator cannot add actuator as the NN is already using all available actuators");
+			AvailableActuators ->
+				NewActuatorId = {{-1, genotype:generate_unique_id(TimeProvider)}, actuator},
+				NewActuator = (lists:nth(random:uniform(length(AvailableActuators)), AvailableActuators))#actuator{
+					id = NewActuatorId,
+					cortex_id = CortexId
+				},
+				genotype:write(NewActuator),
+				NeuronIds = Cortex#cortex.neuron_ids,
+				NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
+				create_link_between_elements(AgentId, NeuronId, NewActuatorId),
+				UpdatedCortex = Cortex#cortex{
+					actuator_ids = [NewActuatorId|Cortex#cortex.actuator_ids]
+				},
+				UpdatedAgent = Agent#agent{
+					evo_hist = [{add_actuator, NewActuatorId, NeuronId}|Agent#agent.evo_hist]
+				},
+				genotype:write(UpdatedAgent),
+				genotype:write(UpdatedCortex)
+		end
 	end.
 
 select_random_neuron(Agent) ->
@@ -614,3 +628,24 @@ cut_link_to_actuator(Actuator, NeuronId) ->
 get_generation(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
 	Agent#agent.generation.
+
+test_x() ->
+	Result = genotype:mutate(test),
+	case Result of
+		{atomic, _} ->
+			io:format("******** Mutation Succesful.~n");
+		_ ->
+			io:format("******** Mutation Failure: ~p~n", [Result])
+	end.
+
+test_x(AgentId, Mutator) ->
+	F = fun() ->
+		{M, Args} = lists:keyfind(Mutator, 1, ?MUTATORS),
+		case Args of
+			[] ->
+				genotype_mutator:M(AgentId);
+			_ ->
+				(apply(genotype_mutator, M, Args))(AgentId)
+		end
+	end,
+	mnesia:transaction(F).

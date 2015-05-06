@@ -253,7 +253,7 @@ add_neuron_test_(_) ->
 	% Will result in a generated unique id of 80
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> genotype_mutator:add_neuron(?AGENT, FakeTimeProvider) end),
+	in_transaction(fun() -> (genotype_mutator:add_neuron(FakeTimeProvider))(?AGENT) end),
 	
 	NewNeuron = find_neuron(NewNeuronId),
 
@@ -281,7 +281,7 @@ outsplice_test_(_) ->
 	
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> genotype_mutator:outsplice(?AGENT, FakeTimeProvider) end),
+	in_transaction(fun() -> (genotype_mutator:outsplice(FakeTimeProvider))(?AGENT) end),
 
 	NewNeuron = find_neuron(NewNeuronId),
 	NeuronC = find_neuron(?C),
@@ -310,7 +310,7 @@ add_sensor_test_(_) ->
 
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> genotype_mutator:add_sensor(?AGENT, FakeTimeProvider) end),
+	in_transaction(fun() -> (genotype_mutator:add_sensor(FakeTimeProvider))(?AGENT) end),
 
 	NewSensor = find_sensor(NewSensorId),
 	NeuronC = find_neuron(?C),
@@ -336,7 +336,7 @@ add_actuator_test_(_) ->
 
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> genotype_mutator:add_actuator(?AGENT, FakeTimeProvider) end),
+	in_transaction(fun() -> (genotype_mutator:add_actuator(FakeTimeProvider))(?AGENT) end),
 
 	NewActuator = find_actuator(NewActuatorId),
 	NeuronC = find_neuron(?C),
