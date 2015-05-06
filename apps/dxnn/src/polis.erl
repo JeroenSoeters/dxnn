@@ -58,7 +58,7 @@ init({Mods, PublicScapes}) ->
 	process_flag(trap_exit, true),
 	register(polis, self()),
 	io:format("Parameters:~p~n", [{Mods, PublicScapes}]),
-	mnesia:start(),
+	ok = mnesia:start(),
 	start_supmods(Mods),
 	ActivePublicScapes = start_scapes(PublicScapes, []),
 	io:format("******** Polis: ##MATHEMA## is now online.~n"),
