@@ -70,6 +70,9 @@ teardown(_) ->
 %% ===================================================================
 
 mutate_weights_test_(_) ->
+	% First time it takes a bit longer on the build agent
+	timer:sleep(500),
+	
 	% This will select neuron C from our cortex since we have 4 neurons.. Neuron Ci has 2 weights.
 	% MP = 1/sqrt(2) is 0.7. We thus expect both weights to be changed as 1 > 0.7.
 	meck:sequence(random, uniform, 1, [3]),
