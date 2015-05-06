@@ -15,7 +15,8 @@ genome_mutator_test_() ->
 	{foreach,
 	 fun setup/0,
 	 fun teardown/1,
-	 [fun ?MODULE:mutate_weights_test_/1,
+	 [%fun ?MODULE:mutate_test_/1,
+	  fun ?MODULE:mutate_weights_test_/1,
 	  fun ?MODULE:add_bias_test_/1,
 	  fun ?MODULE:remove_bias_test_/1,
 	  fun ?MODULE:mutate_af_test_/1,
@@ -40,15 +41,8 @@ genome_mutator_test_() ->
 %% ===================================================================
 
 setup() ->
-	%email_address:is_valid("jsoeters@thoughtworks.com"),
-
-	case whereis(polis) of
-		undefined ->
-			mnesia:start(),
-			polis:start();
-		_ -> 
-			polis:reset()
-	end,
+	mnesia:delete_schema({node()}),
+	polis:start(),
 	F = fun() ->
 		[mnesia:write(R) || R <- create_test_genotype()]
 	end,
@@ -70,9 +64,6 @@ teardown(_) ->
 %% ===================================================================
 
 mutate_weights_test_(_) ->
-	% First time it takes a bit longer on the build agent
-	timer:sleep(500),
-	
 	% This will select neuron C from our cortex since we have 4 neurons.. Neuron Ci has 2 weights.
 	% MP = 1/sqrt(2) is 0.7. We thus expect both weights to be changed as 1 > 0.7.
 	meck:sequence(random, uniform, 1, [3]),
