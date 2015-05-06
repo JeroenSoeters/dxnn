@@ -15,7 +15,7 @@ genome_mutator_test_() ->
 	{foreach,
 	 fun setup/0,
 	 fun teardown/1,
-	 [%fun ?MODULE:mutate_test_/1,
+	 [fun ?MODULE:mutate_test_/1,
 	  fun ?MODULE:mutate_weights_test_/1,
 	  fun ?MODULE:add_bias_test_/1,
 	  fun ?MODULE:remove_bias_test_/1,
@@ -46,7 +46,7 @@ setup() ->
 	in_transaction(fun() ->	[mnesia:write(R) || R <- create_test_genotype()] end),
 	case whereis(random_meck) of
 		undefined ->
-			meck:new(random, [unstick]);
+			meck:new(random, [unstick, passthrough]);
 		_ ->
 			meck:unload(random),
 			meck:new(random, [unstick])
@@ -56,8 +56,21 @@ teardown(_) ->
 	polis:stop(),
 	meck:unload(random).
 
+%% ===================================================================
+%% Genome mutator
+%% ===================================================================
+
 mutate_test_(_) ->
-	?_assert(false).
+	% We mock random:uniform/1 to return 2 which will be the number of mutation operators applied. 
+	% Then the sequence keeps returning 1 which results in mutating the weights of neuron a twice.
+	meck:sequence(random, uniform, 1, [2, 1]),
+
+	genotype_mutator:mutate(?AGENT),
+
+	Agent = find_agent(?AGENT),
+	
+	[?_assertEqual(1, Agent#agent.generation),
+	 ?_assertEqual(2, length(Agent#agent.evo_hist))].
 
 %% ===================================================================
 %% Mutation operators

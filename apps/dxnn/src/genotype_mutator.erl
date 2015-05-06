@@ -4,7 +4,59 @@
 -compile(export_all).
 -define(DELTA_MULTIPLIER, math:pi()*2).
 -define(SAT_LIMIT, math:pi()*2).
+-define(MUTATORS, [
+	mutate_weights,
+	add_bias,
+	remove_bias,
+	add_outlink,
+	add_inlink,
+	add_sensorlink,
+	add_actuatorlink,
+	add_neuron,
+	outsplice,
+	add_sensor,
+	add_actuator
+]).
 
+mutate(AgentId) ->
+	random:seed(now()),
+	F = fun() ->
+		Agent = genotype:read({agent, AgentId}),
+		NextGeneration = Agent#agent.generation + 1,
+		genotype:write(Agent#agent{generation = NextGeneration}),
+		apply_mutation_operators(AgentId)
+	end,
+	mnesia:transaction(F).
+
+apply_mutation_operators(AgentId) ->
+	Agent = genotype:read({agent, AgentId}),
+	Cortex = genotype:read({cortex, Agent#agent.cortex_id}),
+	Neurons = length(Cortex#cortex.neuron_ids),
+	Mutations = random:uniform(round(math:sqrt(Neurons))),
+	io:format("Total number of neurons: ~p Performing ~p mutations on agent: ~p", [Neurons, Mutations, AgentId]),
+	apply_mutation_operators(AgentId, Mutations).
+
+apply_mutation_operators(_AgentId, 0) ->
+	done;
+apply_mutation_operators(AgentId, Index) ->
+	?debugFmt("~n~p~n", [Index]),
+	Result = apply_mutation_operator(AgentId),
+	case Result of
+		{atomic, _} ->
+			apply_mutation_operators(AgentId, Index - 1);
+		Error ->
+			io:format("~p~n Retrying with new mutation operator...~n", [Error]),
+			apply_mutation_operators(AgentId, Index)
+	end.
+
+apply_mutation_operator(AgentId) ->
+	F = fun() ->
+		Mutators = ?MUTATORS,
+		Mutator = lists:nth(random:uniform(length(Mutators)), Mutators),
+		io:format("Mutation Operator: ~p~n", [Mutator]),
+		genotype_mutator:Mutator(AgentId)
+	end,
+	mnesia:transaction(F).
 
 %% ===================================================================
 %% Mutation operators
