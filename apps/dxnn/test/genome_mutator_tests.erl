@@ -1,4 +1,4 @@
--module(genotype_mutator_tests).
+-module(genome_mutator_tests).
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/records.hrl").
@@ -65,7 +65,7 @@ mutate_test_(_) ->
 	% Then the sequence keeps returning 1 which results in mutating the weights of neuron a twice.
 	meck:sequence(random, uniform, 1, [2, 1]),
 
-	genotype_mutator:mutate(?AGENT),
+	genome_mutator:mutate(?AGENT),
 
 	Agent = find_agent(?AGENT),
 	
@@ -82,7 +82,7 @@ mutate_weights_test_(_) ->
 	meck:sequence(random, uniform, 1, [3]),
 	meck:sequence(random, uniform, 0, [0.4, 0.6]),
 
-	in_transaction(fun() ->	genotype_mutator:mutate_weights(?AGENT) end),	
+	in_transaction(fun() ->	genome_mutator:mutate_weights(?AGENT) end),	
 	
 	NeuronC = find_neuron(?C),
 	Agent = find_agent(?AGENT),
@@ -98,7 +98,7 @@ add_bias_test_(_) ->
 	meck:sequence(random, uniform, 1, [1]),
 	meck:sequence(random, uniform, 0, [0.9]),
 
-	in_transaction(fun() -> genotype_mutator:add_bias(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_bias(?AGENT) end),
 
 	NeuronA = find_neuron(?A),
 	Agent = find_agent(?AGENT),
@@ -110,7 +110,7 @@ add_bias_test_(_) ->
 remove_bias_test_(_) ->
 	meck:sequence(random, uniform, 1, [4]),
 
-	in_transaction(fun() -> genotype_mutator:remove_bias(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:remove_bias(?AGENT) end),
 
 	NeuronD = find_neuron(?D),
 	Agent = find_agent(?AGENT),
@@ -125,7 +125,7 @@ mutate_af_test_(_) ->
 	% this test breaks as we add more activation functions in records.hrl.
 	meck:sequence(random, uniform, 1, [2]),
 	
-	in_transaction(fun() -> genotype_mutator:mutate_af(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:mutate_af(?AGENT) end),
 
 	NeuronB = find_neuron(?B),
 	Agent = find_agent(?AGENT),	
@@ -140,7 +140,7 @@ add_outlink_to_neuron_test_(_) ->
 	meck:sequence(random, uniform, 1, [2, 3]),
 	meck:sequence(random, uniform, 0, [0.2, 0.3]),
 
-	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_outlink(?AGENT) end),
 
 	NeuronB = find_neuron(?B),
 	NeuronD = find_neuron(?D),
@@ -156,7 +156,7 @@ add_outlink_to_actuator_test_(_) ->
 	% the second element, actuator is then the 4rd as c is removed from the list as it's already connected.
 	meck:sequence(random, uniform, 1, [2, 4]),
 
-	in_transaction(fun() -> genotype_mutator:add_outlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_outlink(?AGENT) end),
 
 	NeuronB = find_neuron(?B),
 	Actuator = find_actuator(?ACTUATOR),
@@ -173,7 +173,7 @@ add_inlink_from_neuron_test_(_) ->
 	meck:sequence(random, uniform, 1, [1, 4]),
 	meck:sequence(random, uniform, 0, [0.4, 0.9]),
 
-	in_transaction(fun() -> genotype_mutator:add_inlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_inlink(?AGENT) end),
 
 	NeuronA = find_neuron(?A),
 	NeuronD = find_neuron(?D),
@@ -190,7 +190,7 @@ add_inlink_from_sensor_test_(_) ->
 	meck:sequence(random, uniform, 1, [4, 1]),
 	meck:sequence(random, uniform, 0, [0.4, 0.9]),
 
-	in_transaction(fun() -> genotype_mutator:add_inlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_inlink(?AGENT) end),
 
 	Sensor = find_sensor(?SENSOR),
 	NeuronD = find_neuron(?D),
@@ -207,7 +207,7 @@ add_sensorlink_test_(_) ->
 	meck:sequence(random, uniform, 1, [1, 1]),
 	meck:sequence(random, uniform, 0, [0.5, 0.6]),
 	
-	in_transaction(fun() -> genotype_mutator:add_sensorlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_sensorlink(?AGENT) end),
 
 	Sensor = find_sensor(?SENSOR),
 	NeuronC = find_neuron(?C),
@@ -223,7 +223,7 @@ add_actuatorlink_test_(_) ->
 	% the list of available neurons [a, b, c] which is neuron a.
 	meck:sequence(random, uniform, 1, [1, 1]),
 
-	in_transaction(fun() -> genotype_mutator:add_actuatorlink(?AGENT) end),
+	in_transaction(fun() -> genome_mutator:add_actuatorlink(?AGENT) end),
 	
 	NeuronA = find_neuron(?A),
 	Actuator = find_actuator(?ACTUATOR),
@@ -253,7 +253,7 @@ add_neuron_test_(_) ->
 	% Will result in a generated unique id of 80
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> (genotype_mutator:add_neuron(FakeTimeProvider))(?AGENT) end),
+	in_transaction(fun() -> (genome_mutator:add_neuron(FakeTimeProvider))(?AGENT) end),
 	
 	NewNeuron = find_neuron(NewNeuronId),
 
@@ -281,7 +281,7 @@ outsplice_test_(_) ->
 	
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> (genotype_mutator:outsplice(FakeTimeProvider))(?AGENT) end),
+	in_transaction(fun() -> (genome_mutator:outsplice(FakeTimeProvider))(?AGENT) end),
 
 	NewNeuron = find_neuron(NewNeuronId),
 	NeuronC = find_neuron(?C),
@@ -310,7 +310,7 @@ add_sensor_test_(_) ->
 
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> (genotype_mutator:add_sensor(FakeTimeProvider))(?AGENT) end),
+	in_transaction(fun() -> (genome_mutator:add_sensor(FakeTimeProvider))(?AGENT) end),
 
 	NewSensor = find_sensor(NewSensorId),
 	NeuronC = find_neuron(?C),
@@ -336,7 +336,7 @@ add_actuator_test_(_) ->
 
 	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
 
-	in_transaction(fun() -> (genotype_mutator:add_actuator(FakeTimeProvider))(?AGENT) end),
+	in_transaction(fun() -> (genome_mutator:add_actuator(FakeTimeProvider))(?AGENT) end),
 
 	NewActuator = find_actuator(NewActuatorId),
 	NeuronC = find_neuron(?C),
@@ -420,10 +420,10 @@ cut_link_between_neuron_and_actuator_test_(_) ->
 	?_assert(not lists:member(?D, Actuator#actuator.fanin_ids))].
 
 create_link_between_elements(From, To) ->
-	in_transaction(fun() -> genotype_mutator:create_link_between_elements(?AGENT, From, To) end).
+	in_transaction(fun() -> genome_mutator:create_link_between_elements(?AGENT, From, To) end).
 
 cut_link_between_elements(From, To) ->
-	in_transaction(fun() ->	genotype_mutator:cut_link_between_elements(?AGENT, From, To) end).
+	in_transaction(fun() ->	genome_mutator:cut_link_between_elements(?AGENT, From, To) end).
 
 find_neuron(NeuronId) ->
 	find_node(neuron, NeuronId).
