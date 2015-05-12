@@ -322,6 +322,14 @@ read(TableAndKey) ->
 			Record
 	end.
 
+dirty_read(TableAndKey)->
+	case mnesia:dirty_read(TableAndKey) of
+		[] ->
+			undefined;
+		[Record] ->
+			Record
+	end.
+
 %% doc accepts a record and writes it to the database
 write(Record) ->
 	mnesia:write(Record).
