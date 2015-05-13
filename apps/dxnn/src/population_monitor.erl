@@ -4,7 +4,7 @@
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
--export([init/1]).
+-export([init/1, handle_cast/2]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 
@@ -93,3 +93,28 @@ summon_agents(OpMode, [AgentId|AgentIds], Acc) ->
 	summon_agents(OpMode, AgentIds, [{AgentId, Pid}|Acc]);
 summon_agents(_OpMode, [], Acc) ->
 	Acc.
+
+handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State) 
+	when State#state.selection_algorithm == competition ->
+	PopulationId = State#state.population_id,
+	OpTag = State#state.op_tag,
+	AgentsLeft = State#state.agents_left,
+	OpMode = State#state.op_mode,
+	UpdatedEvalAcc = State#state.eval_acc + Evals,
+	UpdatedCycleAcc = State#state.cycle_acc + Cycles,
+	UpdatedTimeAcc = State#state.time_acc + Time,
+	case (AgentsLeft - 1) =< 0 of
+		true ->
+			not_implemented;
+		false ->
+			UpdatedActiveAgentIdsAndPids = lists:keydelete(AgentId, 1, State#state.active_agent_ids_and_pids),
+			{noreply, State#state{ 
+				active_agent_ids_and_pids = UpdatedActiveAgentIdsAndPids,
+				agents_left = AgentsLeft - 1,
+				eval_acc = UpdatedEvalAcc,
+				cycle_acc = UpdatedCycleAcc,
+				time_acc = UpdatedTimeAcc
+			}}
+	end.
+
+	
