@@ -17,7 +17,8 @@ population_monitor_test_() ->
 	 fun setup/0,
 	 fun teardown/1,
 	 [fun ?MODULE:init_test_/1,
-	  fun ?MODULE:an_agent_terminated_test_/1]}.
+	  fun ?MODULE:an_agent_terminated_test_/1,
+	  fun ?MODULE:extract_all_agent_ids_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -81,8 +82,36 @@ an_agent_terminated_test_(_) ->
 	 ?_assertEqual(3, State#state.cycle_acc),
 	 ?_assertEqual(4, State#state.time_acc)].
 	
-last_agent_terminated_test_(_) ->
-	ok.
+last_agent_terminated_then_continue_end_condition_not_reached_test_(_) ->
+	{noreply, State} = population_monitor:handle_cast(
+		{?AGENT1, terminated, 100, 1, 1, 1},
+		#state{
+			active_agent_ids_and_pids = [{?AGENT1, 1}, {?AGENT2, 2}, {?AGENT3, 3}],
+			agents_left = 3,
+			eval_acc = 1,
+			cycle_acc = 2,
+			time_acc = 3,
+			selection_algorithm = competition
+		}),
+	
+	not_implemented.
+
+last_agent_terminated_then_continue_end_condition_reached_test_(_) ->
+	not_implemented.
+
+last_agent_terminated_then_pause_test_(_) ->
+	not_implemented.
+
+last_agent_terminated_then_done_test_(_) ->
+	not_implemented.
+
+extract_all_agent_ids_test_(_) ->
+	AgentIds = population_monitor:extract_agent_ids(?POPULATION, all),
+	
+	 [?_assert(lists:member(?AGENT1, AgentIds)),
+	 ?_assert(lists:member(?AGENT2, AgentIds)),
+	 ?_assert(lists:member(?AGENT3, AgentIds)),
+	 ?_assert(lists:member(?AGENT4, AgentIds))].
 
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
