@@ -105,7 +105,17 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 	UpdatedTimeAcc = State#state.time_acc + Time,
 	case (AgentsLeft - 1) =< 0 of
 		true ->
-			not_implemented;
+			% mutate population
+			% UpdatedGeneration ++
+			% when continue...
+				% read species
+				% foreach species read fitness
+				% calculate best fitness
+				% when stopping condition not reached...
+					% extract agent ids
+					% update agent ids and pids by summoning agents
+					% update state
+					{noreply, State};
 		false ->
 			UpdatedActiveAgentIdsAndPids = lists:keydelete(AgentId, 1, State#state.active_agent_ids_and_pids),
 			{noreply, State#state{ 
@@ -117,4 +127,51 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 			}}
 	end.
 
+mutate_population(PopulationId, SelectionAlgorithm) ->
+	% calclulate neural energy cost
+	% in transaction do
+		% read species (from population)
+		% mutate species
+	not_implemented.
+
+mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm) ->
+	% read species
+	% calculate species fitness
+	% construct and sort agent summaries
+	% when competition...
+		% calculate # survivors
+		% SDX = something
+		% properly sort agent summaries ?!?! WTF
+		% calculate valid agent summaries
+		% calculate invalid agent summaries
+		% obtain invalid agent ids
+		% delete invalid agents
+		% extract top agent ids
+		% new agent ids with competition algorithm
+	not_implemented.
+
+calclulate_species_fitness(SpeciesId) ->
+	not_implemented.
+
+construct_agent_summaries(AgentIds) ->
+	not_implemented.
+
+competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost) ->
+	% calculate alotments p and next generation size estimate
+	% calculate normalizer
+	% gather survivors
+	not_implemented.
+
+calculate_neural_energy_cost(PopulationId) ->
+	% extract agent ids
+	% sum fitness of all neurons
+	% sum number of neurons of all agents
+	% energy cost is total fitness / total neurons
+	not_implemented.
+
+calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], NeuralEnergyCost, Acc, NewPopAcc) ->
+	not_implemented.
+
+
+	
 	
