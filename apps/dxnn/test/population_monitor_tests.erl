@@ -9,6 +9,10 @@
 -define(AGENT2, {a2, agent}).
 -define(AGENT3, {a3, agent}).
 -define(AGENT4, {a4, agent}).
+-define(CORTEX1, {c1, cortex}).
+-define(CORTEX2, {c2, cortex}).
+-define(CORTEX3, {c3, cortex}).
+-define(CORTEX4, {c4, cortex}).
 
 -record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm}).
 
@@ -18,7 +22,8 @@ population_monitor_test_() ->
 	 fun teardown/1,
 	 [fun ?MODULE:init_test_/1,
 	  fun ?MODULE:an_agent_terminated_test_/1,
-	  fun ?MODULE:extract_all_agent_ids_test_/1]}.
+	  fun ?MODULE:extract_all_agent_ids_test_/1,
+	  fun ?MODULE:calculate_neural_energy_cost_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -113,6 +118,11 @@ extract_all_agent_ids_test_(_) ->
 	 ?_assert(lists:member(?AGENT3, AgentIds)),
 	 ?_assert(lists:member(?AGENT4, AgentIds))].
 
+calculate_neural_energy_cost_test_(_) ->
+	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(?POPULATION),
+		
+	?_assertEqual(20.0, NeuralEnergyCost).
+
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
 
@@ -133,4 +143,40 @@ create_test_population() ->
 		id = ?SPECIES2,
 		population_id = ?POPULATION,
 		agent_ids = [?AGENT3, ?AGENT4]
+	 },
+	 #agent{
+		id = ?AGENT1,
+		cortex_id = ?CORTEX1,
+		fitness = 10
+	 },
+	 #agent{
+		id = ?AGENT2,
+		cortex_id = ?CORTEX2,
+		fitness = 20
+	 },
+	 #agent{
+		id = ?AGENT3,
+		cortex_id = ?CORTEX3,
+		fitness = 30
+	 },
+	 #agent{
+		id = ?AGENT4,
+		cortex_id = ?CORTEX4,
+		fitness = 40
+	 },
+	 #cortex{
+		id = ?CORTEX1,
+		neuron_ids = [{{1, n1}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX2,
+		neuron_ids = [{{2, n2}, neuron}, {{3, n3}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX3,
+		neuron_ids = [{{4, n4}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX4,
+		neuron_ids = [{{5, n5}, neuron}]
 	 }].

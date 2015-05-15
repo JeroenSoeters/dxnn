@@ -7,6 +7,8 @@
 -export([init/1, handle_cast/2, extract_agent_ids/2]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
+% exporting just for tests?
+-export([extract_agent_ids/2, calculate_neural_energy_cost/1]).
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -163,11 +165,14 @@ competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost) ->
 	not_implemented.
 
 calculate_neural_energy_cost(PopulationId) ->
-	% extract agent ids
-	% sum fitness of all neurons
-	% sum number of neurons of all agents
-	% energy cost is total fitness / total neurons
-	not_implemented.
+	AgentIds = extract_agent_ids(PopulationId, all),
+	Agents = [genotype:dirty_read({agent, AgentId}) || AgentId <- AgentIds],
+	TotalFitness = lists:sum([Agent#agent.fitness || Agent <- Agents]),
+	TotalNeurons = lists:sum([get_neuron_count(Agent#agent.cortex_id) || Agent <- Agents]),
+	TotalFitness / TotalNeurons.
+
+get_neuron_count(CortexId) ->
+	length((genotype:dirty_read({cortex, CortexId}))#cortex.neuron_ids).
 
 calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], NeuralEnergyCost, Acc, NewPopAcc) ->
 	not_implemented.
