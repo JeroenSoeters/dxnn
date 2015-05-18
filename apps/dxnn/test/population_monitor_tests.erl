@@ -24,7 +24,8 @@ population_monitor_test_() ->
 	  fun ?MODULE:an_agent_terminated_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
-	  fun ?MODULE:construct_agent_summaries_test_/1]}.
+	  fun ?MODULE:construct_agent_summaries_test_/1,
+	  fun ?MODULE:calculate_alotments_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -128,6 +129,13 @@ construct_agent_summaries_test_(_) ->
 	AgentSummaries = population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]),
 	
 	?_assertEqual([{10, 1, ?AGENT1}, {20, 2, ?AGENT2}], AgentSummaries).
+
+calculate_alotments_test_(_) ->
+	{AlotmentsPlusAgentSummaries, EstimatedPopulationSize} = 
+		population_monitor:calculate_alotments(population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]), 2),
+
+	[?_assertEqual([{5.0, 10, 1, ?AGENT1}, {5.0, 20, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
+	 ?_assertEqual(10.0, EstimatedPopulationSize)].
 
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).

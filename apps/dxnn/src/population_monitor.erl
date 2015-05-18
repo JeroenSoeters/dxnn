@@ -8,7 +8,7 @@
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
--export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1]).
+-export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2]).
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -180,9 +180,15 @@ calculate_neural_energy_cost(PopulationId) ->
 get_neuron_count(CortexId) ->
 	length((genotype:dirty_read({cortex, CortexId}))#cortex.neuron_ids).
 
-calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], NeuralEnergyCost, Acc, NewPopAcc) ->
-	not_implemented.
-
+calculate_alotments(SortedAgentSummaries, NeuralEnergyCost) ->
+	calculate_alotments(SortedAgentSummaries, NeuralEnergyCost, [], 0).
+calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], NeuralEnergyCost, Acc, EstimatedPopulationSizeAcc) ->
+	NeuralAlotment = Fitness / NeuralEnergyCost,
+	MutantAlotment = NeuralAlotment / TotalNeurons,
+	UpdatedEstimatedPopulationSizeAcc = EstimatedPopulationSizeAcc + MutantAlotment,
+	calculate_alotments(SortedAgentSummaries, NeuralEnergyCost, [{MutantAlotment, Fitness, TotalNeurons, AgentId}|Acc], UpdatedEstimatedPopulationSizeAcc); 
+calculate_alotments([], _NeuralEnergyCost, Acc, EstimatedPopulationSize) ->
+	{lists:reverse(Acc), EstimatedPopulationSize}.
 
 	
 	
