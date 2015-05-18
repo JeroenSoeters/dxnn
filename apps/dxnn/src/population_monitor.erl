@@ -8,7 +8,7 @@
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
--export([extract_agent_ids/2, calculate_neural_energy_cost/1]).
+-export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1]).
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -156,7 +156,13 @@ calclulate_species_fitness(SpeciesId) ->
 	not_implemented.
 
 construct_agent_summaries(AgentIds) ->
-	not_implemented.
+	construct_agent_summaries(AgentIds, []).
+construct_agent_summaries([AgentId|AgentIds], Acc) ->
+	Agent = genotype:dirty_read({agent, AgentId}),
+	Cortex = genotype:dirty_read({cortex, Agent#agent.cortex_id}),
+	construct_agent_summaries(AgentIds, [{Agent#agent.fitness, length(Cortex#cortex.neuron_ids), AgentId}|Acc]);
+construct_agent_summaries([], Acc) ->
+	lists:reverse(Acc).
 
 competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost) ->
 	% calculate alotments p and next generation size estimate
