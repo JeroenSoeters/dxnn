@@ -9,10 +9,14 @@
 -define(AGENT2, {a2, agent}).
 -define(AGENT3, {a3, agent}).
 -define(AGENT4, {a4, agent}).
+-define(AGENT5, {a5, agent}).
+-define(AGENT6, {a6, agent}).
 -define(CORTEX1, {c1, cortex}).
 -define(CORTEX2, {c2, cortex}).
 -define(CORTEX3, {c3, cortex}).
 -define(CORTEX4, {c4, cortex}).
+-define(CORTEX5, {c5, cortex}).
+-define(CORTEX6, {c6, cortex}).
 
 -record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm}).
 
@@ -112,6 +116,11 @@ last_agent_terminated_then_pause_test_(_) ->
 last_agent_terminated_then_done_test_(_) ->
 	not_implemented.
 
+competition_test_(_) ->
+	FakeTimeProvider = fun() -> {0, 5, 0} end,
+
+	not_implemented.
+
 extract_all_agent_ids_test_(_) ->
 	AgentIds = population_monitor:extract_agent_ids(?POPULATION, all),
 	
@@ -123,19 +132,19 @@ extract_all_agent_ids_test_(_) ->
 calculate_neural_energy_cost_test_(_) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(?POPULATION),
 		
-	?_assertEqual(20.0, NeuralEnergyCost).
+	?_assertEqual(15.8, NeuralEnergyCost).
 
 construct_agent_summaries_test_(_) ->
 	AgentSummaries = population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]),
 	
-	?_assertEqual([{10, 1, ?AGENT1}, {20, 2, ?AGENT2}], AgentSummaries).
+	?_assertEqual([{4, 1, ?AGENT1}, {30, 2, ?AGENT2}], AgentSummaries).
 
 calculate_alotments_test_(_) ->
 	{AlotmentsPlusAgentSummaries, EstimatedPopulationSize} = 
 		population_monitor:calculate_alotments(population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]), 2),
 
-	[?_assertEqual([{5.0, 10, 1, ?AGENT1}, {5.0, 20, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
-	 ?_assertEqual(10.0, EstimatedPopulationSize)].
+	[?_assertEqual([{2.0, 4, 1, ?AGENT1}, {7.5, 30, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
+	 ?_assertEqual(9.5, EstimatedPopulationSize)].
 
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
@@ -161,36 +170,60 @@ create_test_population() ->
 	 #agent{
 		id = ?AGENT1,
 		cortex_id = ?CORTEX1,
-		fitness = 10
+		fitness = 4,
+		generation = 0
 	 },
 	 #agent{
 		id = ?AGENT2,
 		cortex_id = ?CORTEX2,
-		fitness = 20
+		fitness = 30,
+		generation = 0
 	 },
 	 #agent{
 		id = ?AGENT3,
 		cortex_id = ?CORTEX3,
-		fitness = 30
+		fitness = 40,
+		generation = 0
 	 },
 	 #agent{
 		id = ?AGENT4,
 		cortex_id = ?CORTEX4,
-		fitness = 40
+		fitness = 5,
+		generation = 0
+	 },
+	 #agent{
+		id = ?AGENT5,
+		cortex_id = ?CORTEX5,
+		fitness = 4,
+		generation = 0
+	 },
+	 #agent{
+		id = ?AGENT6,
+		cortex_id = ?CORTEX6,
+		fitness = 0,
+		generation = 0
 	 },
 	 #cortex{
 		id = ?CORTEX1,
-		neuron_ids = [{{1, n1}, neuron}]
+		neuron_ids = [{{0, n1}, neuron}]
 	 },
 	 #cortex{
 		id = ?CORTEX2,
-		neuron_ids = [{{2, n2}, neuron}, {{3, n3}, neuron}]
+		neuron_ids = [{{0, n2}, neuron}, {{0, n3}, neuron}]
 	 },
 	 #cortex{
 		id = ?CORTEX3,
-		neuron_ids = [{{4, n4}, neuron}]
+		neuron_ids = [{{0, n4}, neuron}]
 	 },
 	 #cortex{
 		id = ?CORTEX4,
-		neuron_ids = [{{5, n5}, neuron}]
+		neuron_ids = [{{0, n5}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX5,
+		neuron_ids = [{{0, n6}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX6,
+		neuron_ids = [{{0, n7}, neuron}]
 	 }].
