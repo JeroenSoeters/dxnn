@@ -11,12 +11,16 @@
 -define(AGENT4, {a4, agent}).
 -define(AGENT5, {a5, agent}).
 -define(AGENT6, {a6, agent}).
+-define(AGENT7, {a7, agent}).
+-define(AGENT8, {a8, agent}).
 -define(CORTEX1, {c1, cortex}).
 -define(CORTEX2, {c2, cortex}).
 -define(CORTEX3, {c3, cortex}).
 -define(CORTEX4, {c4, cortex}).
 -define(CORTEX5, {c5, cortex}).
 -define(CORTEX6, {c6, cortex}).
+-define(CORTEX7, {c7, cortex}).
+-define(CORTEX8, {c8, cortex}).
 
 -record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm}).
 
@@ -29,7 +33,8 @@ population_monitor_test_() ->
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
-	  fun ?MODULE:calculate_alotments_test_/1]}.
+	  fun ?MODULE:calculate_alotments_test_/1,
+	  fun ?MODULE:mutate_population_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -57,18 +62,24 @@ teardown(_) ->
 init_test_(_) ->
 	% Mock exoself:start/1 to just return an incrementing process id as we don't want to test the exoself here
 	% but just test the population monitor in isolation.
-	meck:sequence(exoself, start, 1, [1, 2, 3, 4]),
+	meck:sequence(exoself, start, 1, [1, 2, 3, 4, 5, 6, 7, 8]),
 
 	{ok, State} = population_monitor:init({gt, ?POPULATION, competition}),
 
+	?debugFmt("\n >>> State: ~p <<< \n", [State]),
+
 	[?_assertEqual(gt, State#state.op_mode),
 	 ?_assertEqual(?POPULATION, State#state.population_id),
-	 ?_assert(lists:member({?AGENT1, 3}, State#state.active_agent_ids_and_pids)),
-	 ?_assert(lists:member({?AGENT2, 4}, State#state.active_agent_ids_and_pids)),
-	 ?_assert(lists:member({?AGENT3, 1}, State#state.active_agent_ids_and_pids)),
-	 ?_assert(lists:member({?AGENT4, 2}, State#state.active_agent_ids_and_pids)),
-	 ?_assertEqual(4, State#state.total_agents),
-	 ?_assertEqual(4, State#state.agents_left),
+	 ?_assert(lists:member({?AGENT1, 5}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT2, 6}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT3, 7}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT4, 8}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT5, 1}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT6, 2}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT7, 3}, State#state.active_agent_ids_and_pids)),
+	 ?_assert(lists:member({?AGENT8, 4}, State#state.active_agent_ids_and_pids)),
+	 ?_assertEqual(8, State#state.total_agents),
+	 ?_assertEqual(8, State#state.agents_left),
 	 ?_assertEqual(continue, State#state.op_tag),
 	 ?_assertEqual(competition, State#state.selection_algorithm),
 	 ?_assertEqual(0, State#state.eval_acc),
@@ -116,8 +127,10 @@ last_agent_terminated_then_pause_test_(_) ->
 last_agent_terminated_then_done_test_(_) ->
 	not_implemented.
 
-competition_test_(_) ->
-	FakeTimeProvider = fun() -> {0, 5, 0} end,
+mutate_population_test_(_) ->
+	FakeTimeProvider = fun() -> {0, 8, 0} end,
+	
+	population_monitor:mutate_population(),
 
 	not_implemented.
 
@@ -132,7 +145,7 @@ extract_all_agent_ids_test_(_) ->
 calculate_neural_energy_cost_test_(_) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(?POPULATION),
 		
-	?_assertEqual(15.8, NeuralEnergyCost).
+	?_assertEqual(67.0, NeuralEnergyCost).
 
 construct_agent_summaries_test_(_) ->
 	AgentSummaries = population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]),
@@ -160,12 +173,12 @@ create_test_population() ->
 	 #species{
 		id = ?SPECIES1,
 		population_id = ?POPULATION,
-		agent_ids = [?AGENT1, ?AGENT2]
+		agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4]
 	 },
 	 #species{
 		id = ?SPECIES2,
 		population_id = ?POPULATION,
-		agent_ids = [?AGENT3, ?AGENT4]
+		agent_ids = [?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8]
 	 },
 	 #agent{
 		id = ?AGENT1,
@@ -182,13 +195,13 @@ create_test_population() ->
 	 #agent{
 		id = ?AGENT3,
 		cortex_id = ?CORTEX3,
-		fitness = 40,
+		fitness = 5,
 		generation = 0
 	 },
 	 #agent{
 		id = ?AGENT4,
 		cortex_id = ?CORTEX4,
-		fitness = 5,
+		fitness = 25,
 		generation = 0
 	 },
 	 #agent{
@@ -200,7 +213,19 @@ create_test_population() ->
 	 #agent{
 		id = ?AGENT6,
 		cortex_id = ?CORTEX6,
-		fitness = 0,
+		fitness = 30,
+		generation = 0
+	 },
+	 #agent{
+		id = ?AGENT7,
+		cortex_id = ?CORTEX7,
+		fitness = 500,
+		generation = 0
+	 },
+	 #agent{
+		id = ?AGENT8,
+		cortex_id = ?CORTEX8,
+		fitness = 5,
 		generation = 0
 	 },
 	 #cortex{
@@ -226,4 +251,12 @@ create_test_population() ->
 	 #cortex{
 		id = ?CORTEX6,
 		neuron_ids = [{{0, n7}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX7,
+		neuron_ids = [{{0, n8}, neuron}]
+	 },
+	 #cortex{
+		id = ?CORTEX8,
+		neuron_ids = [{{0, n9}, neuron}]
 	 }].
