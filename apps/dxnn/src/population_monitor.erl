@@ -8,7 +8,7 @@
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
--export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, mutate_population/3]).
+-export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4]).
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -129,12 +129,14 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 			}}
 	end.
 
-mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm) ->
-	% calclulate neural energy cost
-	% in transaction do
-		% read species (from population)
-		% mutate species
-	not_implemented.
+mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
+	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(PopulationId),
+	F = fun() ->
+		Population = genotype:read({population, PopulationId}),
+		SpeciesIds = Population#population.species_ids,
+		[population_monitor:mutate_species(Id) || Id <- SpeciesIds]
+	end,
+	{atomic, _} = mnesia:transaction(F).
 
 mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm) ->
 	% read species
@@ -152,8 +154,20 @@ mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm)
 		% new agent ids with competition algorithm
 	not_implemented.
 
-calclulate_species_fitness(SpeciesId) ->
-	not_implemented.
+calculate_species_fitness(SpeciesId) ->
+	Species = genotype:dirty_read({species, SpeciesId}),
+	SortedFitnessScores = lists:sort(gather_fitness_scores(Species#species.agent_ids, [])),
+	Average = functions:avg(SortedFitnessScores),
+	StandardDeviation = functions:std(SortedFitnessScores),
+	[Minimum|_] = SortedFitnessScores,
+	[Maximum|_] = lists:reverse(SortedFitnessScores),
+	{Average, StandardDeviation, Minimum, Maximum}.
+
+gather_fitness_scores([AgentId|AgentIds], Acc) ->
+	Agent = genotype:dirty_read({agent, AgentId}),
+	gather_fitness_scores(AgentIds, [Agent#agent.fitness|Acc]);
+gather_fitness_scores([], Acc) ->
+	Acc.
 
 construct_agent_summaries(AgentIds) ->
 	construct_agent_summaries(AgentIds, []).

@@ -13,6 +13,10 @@
 -define(AGENT6, {a6, agent}).
 -define(AGENT7, {a7, agent}).
 -define(AGENT8, {a8, agent}).
+-define(AGENT9, {9, agent}).
+-define(AGENT10, {10, agent}).
+-define(AGENT11, {11, agent}).
+-define(AGENT12, {12, agent}).
 -define(CORTEX1, {c1, cortex}).
 -define(CORTEX2, {c2, cortex}).
 -define(CORTEX3, {c3, cortex}).
@@ -34,7 +38,8 @@ population_monitor_test_() ->
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
 	  fun ?MODULE:calculate_alotments_test_/1,
-	  fun ?MODULE:mutate_population_test_/1]}.
+	  fun ?MODULE:calculate_species_fitness_test_/1]}.
+%	  fun ?MODULE:mutate_population_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -127,12 +132,51 @@ last_agent_terminated_then_pause_test_(_) ->
 last_agent_terminated_then_done_test_(_) ->
 	not_implemented.
 
-mutate_population_test_(_) ->
-	FakeTimeProvider = fun() -> {0, 8, 0} end,
+calculate_species_fitness_test_(_) ->
+	{Average, StandardDeviation, Minimum, Maximum} = population_monitor:calculate_species_fitness(?SPECIES2),
 	
-	population_monitor:mutate_population(),
+	[?_assertEqual(134.75, Average),
+	 ?_assertEqual(211.13428783596473, StandardDeviation),
+	 ?_assertEqual(4, Minimum),
+	 ?_assertEqual(500, Maximum)].
 
-	not_implemented.
+mutate_population_test_(_) ->
+	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
+
+	FakeTimeProvider = fun() -> {0, generate_number(GeneratorPid), 0} end,
+	
+	{atomic, _} = population_monitor:mutate_population(?POPULATION, 4, competition, FakeTimeProvider),
+
+	exit(GeneratorPid, normal),
+
+	[?_assertNot(agent_exists(?AGENT1)),
+	 ?_assert(agent_exists(?AGENT2)),
+	 ?_assertNot(agent_exists(?AGENT3)),
+	 ?_assert(agent_exists(?AGENT4)),
+	 ?_assertNot(agent_exists(?AGENT5)),
+	 ?_assertNot(agent_exists(?AGENT6)),
+	 ?_assert(agent_exists(?AGENT7)),
+	 ?_assertNot(agent_exists(?AGENT8)),
+	 ?_assert(agent_exists(?AGENT9)),
+	 ?_assert(agent_exists(?AGENT10)),
+	 ?_assert(agent_exists(?AGENT11)),
+	 ?_assert(agent_exists(?AGENT12))].
+
+agent_exists(AgentId) ->
+	not (genotype:read({agent, AgentId}) == undefined).
+
+generate_number(GeneratorPid) ->
+	GeneratorPid ! {self(), next},
+	receive
+		N -> N
+	end.
+
+sequence_generator(N) ->
+	receive
+		{Pid, next} ->
+			Pid ! N,
+			sequence_generator(N+1)
+	end.
 
 extract_all_agent_ids_test_(_) ->
 	AgentIds = population_monitor:extract_agent_ids(?POPULATION, all),
@@ -161,6 +205,9 @@ calculate_alotments_test_(_) ->
 
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
+
+fake_time() ->
+	dummy.
 
 create_test_population() ->
 	[#neuron{
