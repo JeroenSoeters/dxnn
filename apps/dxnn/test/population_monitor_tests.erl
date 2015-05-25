@@ -2,9 +2,9 @@
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/records.hrl").
--define(POPULATION, p1).
--define(SPECIES1, s1).
--define(SPECIES2, s2).
+-define(POPULATION, {p1, population}).
+-define(SPECIES1, {s1, species}).
+-define(SPECIES2, {s2, species}).
 -define(AGENT1, {a1, agent}).
 -define(AGENT2, {a2, agent}).
 -define(AGENT3, {a3, agent}).
@@ -13,10 +13,13 @@
 -define(AGENT6, {a6, agent}).
 -define(AGENT7, {a7, agent}).
 -define(AGENT8, {a8, agent}).
--define(AGENT9, {9, agent}).
--define(AGENT10, {10, agent}).
--define(AGENT11, {11, agent}).
--define(AGENT12, {12, agent}).
+% this is quite brittle as this test data is tightly coupled to the implementation,
+% should be fixed later, maybe by just mocking genotype.
+-define(AGENT9, {9.0, agent}).
+-define(AGENT10, {12.0, agent}).
+-define(AGENT11, {15.0, agent}).
+-define(AGENT12, {18.0, agent}).
+-define(AGENT13, {21.0, agent}).
 -define(CORTEX1, {c1, cortex}).
 -define(CORTEX2, {c2, cortex}).
 -define(CORTEX3, {c3, cortex}).
@@ -38,8 +41,8 @@ population_monitor_test_() ->
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
 	  fun ?MODULE:calculate_alotments_test_/1,
-	  fun ?MODULE:calculate_species_fitness_test_/1]}.
-%	  fun ?MODULE:mutate_population_test_/1]}.
+	  fun ?MODULE:calculate_species_fitness_test_/1,
+	  fun ?MODULE:mutate_population_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -70,8 +73,6 @@ init_test_(_) ->
 	meck:sequence(exoself, start, 1, [1, 2, 3, 4, 5, 6, 7, 8]),
 
 	{ok, State} = population_monitor:init({gt, ?POPULATION, competition}),
-
-	?debugFmt("\n >>> State: ~p <<< \n", [State]),
 
 	[?_assertEqual(gt, State#state.op_mode),
 	 ?_assertEqual(?POPULATION, State#state.population_id),
@@ -143,7 +144,7 @@ calculate_species_fitness_test_(_) ->
 mutate_population_test_(_) ->
 	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
 
-	FakeTimeProvider = fun() -> {0, generate_number(GeneratorPid), 0} end,
+	FakeTimeProvider = fun() -> {0, 1/generate_number(GeneratorPid), 0} end,
 	
 	{atomic, _} = population_monitor:mutate_population(?POPULATION, 4, competition, FakeTimeProvider),
 
@@ -163,7 +164,11 @@ mutate_population_test_(_) ->
 	 ?_assert(agent_exists(?AGENT12))].
 
 agent_exists(AgentId) ->
-	not (genotype:read({agent, AgentId}) == undefined).
+	F = fun() ->
+		genotype:read({agent, AgentId}) 
+	end,
+	{atomic, Agent} = mnesia:transaction(F),
+	not (Agent == undefined).
 
 generate_number(GeneratorPid) ->
 	GeneratorPid ! {self(), next},
@@ -189,19 +194,19 @@ extract_all_agent_ids_test_(_) ->
 calculate_neural_energy_cost_test_(_) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(?POPULATION),
 		
-	?_assertEqual(67.0, NeuralEnergyCost).
+	?_assertEqual(66.44444444444444, NeuralEnergyCost).
 
 construct_agent_summaries_test_(_) ->
 	AgentSummaries = population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]),
 	
-	?_assertEqual([{4, 1, ?AGENT1}, {30, 2, ?AGENT2}], AgentSummaries).
+	?_assertEqual([{4, 1, ?AGENT1}, {25, 2, ?AGENT2}], AgentSummaries).
 
 calculate_alotments_test_(_) ->
 	{AlotmentsPlusAgentSummaries, EstimatedPopulationSize} = 
 		population_monitor:calculate_alotments(population_monitor:construct_agent_summaries([?AGENT1, ?AGENT2]), 2),
 
-	[?_assertEqual([{2.0, 4, 1, ?AGENT1}, {7.5, 30, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
-	 ?_assertEqual(9.5, EstimatedPopulationSize)].
+	[?_assertEqual([{2.0, 4, 1, ?AGENT1}, {6.25, 25, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
+	 ?_assertEqual(8.25, EstimatedPopulationSize)].
 
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
@@ -210,10 +215,7 @@ fake_time() ->
 	dummy.
 
 create_test_population() ->
-	[#neuron{
-		id = {{1, 1}, neuron}
-	 },
-	 #population{
+	[#population{
 		id = ?POPULATION,
 		species_ids = [?SPECIES1, ?SPECIES2]
 	 },
@@ -236,7 +238,7 @@ create_test_population() ->
 	 #agent{
 		id = ?AGENT2,
 		cortex_id = ?CORTEX2,
-		fitness = 30,
+		fitness = 25,
 		generation = 0
 	 },
 	 #agent{
@@ -306,4 +308,12 @@ create_test_population() ->
 	 #cortex{
 		id = ?CORTEX8,
 		neuron_ids = [{{0, n9}, neuron}]
+	 },
+	 #neuron{
+		id = {{0, n5}, neuron},
+		cortex_id = ?CORTEX4
+	 },
+	 #neuron{
+		id = {{0, n8}, neuron},
+		cortex_id = ?CORTEX7
 	 }].

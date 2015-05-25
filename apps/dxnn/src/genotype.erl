@@ -1,6 +1,7 @@
 -module(genotype).
 -compile(export_all).
 -include("records.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 %% doc The population montitor should have all the information with regards to the morphologies and species constraints under which the agent's genotype should be created. Thus construct_agent/3 is ran with the parameter SpeciesId to which this NN based system will belong, the AgentId that this NN based intelligent agent will have and the SpeciesConstraint that will define the list of activation functions and other parameters from which the seed agent can choose its parameters. In this function, first the generation is set to 0, since the agent is just created, then construct_cortex/3 is invoked, which creates the NN and returns itss CortexId. Ince the NN is created and the cortex's id is returned, we can fill out the information needed by the agent record and write it to the mnesia database.
 construct_agent(SpeciesId, AgentId, SpeciesConstraint, TimeProvider) ->
@@ -210,6 +211,10 @@ delete_agent(AgentId, safe) ->
 	io:format("delete_agent(AgentId, safe):~p Result:~p~n", [AgentId, Result]).
 
 %% doc accepts an AgentId and CloneId as parameters and then clones the agent. The function first creates an ETS table to which it writes the ids of all the elements of the genotype and their correspondingly generated clone ids. Once all ids an clone ids have been generated, the function begins to clone the actual elements. clone_agent/2 first clones neurons, then sensors and finally the actuators. Once these elements are cloned, the function writes to the database the cloned versions oft he cortex and the agent,
+clone_agent(AgentId, TimeProvider) ->
+	CloneId = {generate_unique_id(TimeProvider), agent},
+	{atomic, _} = clone_agent(AgentId, CloneId, TimeProvider),
+	CloneId.
 clone_agent(AgentId, CloneId, TimeProvider) ->
 	F = fun() ->
 		Agent = read({agent, AgentId}),

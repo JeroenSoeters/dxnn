@@ -134,25 +134,31 @@ mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvide
 	F = fun() ->
 		Population = genotype:read({population, PopulationId}),
 		SpeciesIds = Population#population.species_ids,
-		[population_monitor:mutate_species(Id) || Id <- SpeciesIds]
+		[mutate_species(Id, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm, TimeProvider) || Id <- SpeciesIds]
 	end,
 	{atomic, _} = mnesia:transaction(F).
 
-mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm) ->
-	% read species
-	% calculate species fitness
-	% construct and sort agent summaries
-	% when competition...
-		% calculate # survivors
-		% SDX = something
-		% properly sort agent summaries ?!?! WTF
-		% calculate valid agent summaries
-		% calculate invalid agent summaries
-		% obtain invalid agent ids
-		% delete invalid agents
-		% extract top agent ids
-		% new agent ids with competition algorithm
-	not_implemented.
+mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm, TimeProvider) ->
+	Species = genotype:dirty_read({species, SpeciesId}),
+	{AvgFitness, StdFitness, MinFitness, MaxFitness} = calculate_species_fitness(SpeciesId),
+	SortedAgentSummaries = lists:reverse(lists:sort(construct_agent_summaries(Species#species.agent_ids))),
+	io:format("Selection Algorirthm:~p~n", [SelectionAlgorithm]),
+	case SelectionAlgorithm of
+		competition ->
+			TotalSurvivors = round(length(SortedAgentSummaries) * ?SURVIVAL_PERCENTAGE),
+			SDX = [{Fitness/math:pow(TotalNeurons, ?EFF), {Fitness, TotalNeurons, AgentId}} ||
+				{Fitness, TotalNeurons, AgentId} <- SortedAgentSummaries],
+			ProperlySortedAgentSummaries = [Summary || {_, Summary} <- SDX],
+			ValidAgentSummaries = lists:sublist(ProperlySortedAgentSummaries, TotalSurvivors),
+			InvalidAgentSummaries = ProperlySortedAgentSummaries -- ValidAgentSummaries,
+			[genotype:delete_agent(AgentId) || {_, _, AgentId} <- InvalidAgentSummaries],
+			io:format("Valid_AgentSummaries:~p~n",[ValidAgentSummaries]),
+			io:format("Invalid_AgentSummaries:~p~n",[InvalidAgentSummaries]), 
+			ChampionSummaries = lists:sublist(ValidAgentSummaries, 3),
+			{_, _, ChampionIds} = lists:unzip3(ChampionSummaries),
+			io:format("NeuralEnergyCost:~p~n",[NeuralEnergyCost]),
+			competition(ValidAgentSummaries, PopulationLimit, NeuralEnergyCost, TimeProvider)
+	end.
 
 calculate_species_fitness(SpeciesId) ->
 	Species = genotype:dirty_read({species, SpeciesId}),
@@ -178,11 +184,41 @@ construct_agent_summaries([AgentId|AgentIds], Acc) ->
 construct_agent_summaries([], Acc) ->
 	lists:reverse(Acc).
 
-competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost) ->
-	% calculate alotments p and next generation size estimate
-	% calculate normalizer
-	% gather survivors
-	not_implemented.
+competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost, TimeProvider) ->
+	{Alotments, EstimatedPopulationSize} = calculate_alotments(SortedAgentSummaries, NeuralEnergyCost),
+	Normalizer = EstimatedPopulationSize / PopulationLimit,
+	io:format("Population size normalizer:~p~n", [Normalizer]),
+	gather_survivors(Alotments, Normalizer, TimeProvider).
+
+gather_survivors(Alotments, Normalizer, TimeProvider) ->
+	gather_survivors(Alotments, Normalizer, TimeProvider, []).
+gather_survivors([{MutantAlotment, Fitness, TotalNeurons, AgentId}|Alotments], Normalizer, TimeProvider, Acc) ->
+	NormalizedMutantAlotment = round(MutantAlotment/Normalizer),
+	io:format("Agent_Id:~p Normalized MutantAlotment:~p~n", [AgentId, NormalizedMutantAlotment]),
+	SurvivorAgentIds = case NormalizedMutantAlotment >= 1 of
+		true ->
+			MutantAgentIds = case NormalizedMutantAlotment >= 2 of
+				true ->
+					[create_mutant_agent_copy(AgentId, TimeProvider) || _ <- lists:seq(1, NormalizedMutantAlotment -1)];
+				false ->
+					[]
+			end,
+			[AgentId|MutantAgentIds];
+		false ->
+			io:format("Deleting agent:~p~n", [AgentId]),
+			genotype:delete_agent(AgentId),
+			[]	
+	end,
+	gather_survivors(Alotments, Normalizer, TimeProvider, lists:append(SurvivorAgentIds, Acc));
+gather_survivors([], _Normalizer, _TimeProvider, Acc) ->
+	io:format("New Population:~p PopSize:~p~n", [Acc, length(Acc)]),
+	Acc. 
+
+create_mutant_agent_copy(AgentId, TimeProvider) ->
+	CloneId = genotype:clone_agent(AgentId, TimeProvider),
+	io:format("AgentClone_Id:~p~n", [CloneId]),
+	genome_mutator:mutate(CloneId),
+	CloneId.
 
 calculate_neural_energy_cost(PopulationId) ->
 	AgentIds = extract_agent_ids(PopulationId, all),
@@ -203,6 +239,4 @@ calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], Neu
 	calculate_alotments(SortedAgentSummaries, NeuralEnergyCost, [{MutantAlotment, Fitness, TotalNeurons, AgentId}|Acc], UpdatedEstimatedPopulationSizeAcc); 
 calculate_alotments([], _NeuralEnergyCost, Acc, EstimatedPopulationSize) ->
 	{lists:reverse(Acc), EstimatedPopulationSize}.
-
-	
 	
