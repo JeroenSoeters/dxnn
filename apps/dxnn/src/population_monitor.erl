@@ -157,8 +157,23 @@ mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm,
 			ChampionSummaries = lists:sublist(ValidAgentSummaries, 3),
 			{_, _, ChampionIds} = lists:unzip3(ChampionSummaries),
 			io:format("NeuralEnergyCost:~p~n",[NeuralEnergyCost]),
-			competition(ValidAgentSummaries, PopulationLimit, NeuralEnergyCost, TimeProvider)
-	end.
+			NewAgentIds = competition(ValidAgentSummaries, PopulationLimit, NeuralEnergyCost, TimeProvider)
+	end,
+	{FitnessScores, _, _} = lists:unzip3(SortedAgentSummaries),
+		[TopFitness|_] = FitnessScores,
+		UpdatedInnovationFactor = case TopFitness > Species#species.innovation_factor of
+			true ->
+				0;
+			false ->
+				Species#species.innovation_factor-1
+		end,
+	UpdatedSpecies = Species#species{
+		agent_ids = NewAgentIds,
+		champion_ids = ChampionIds,
+		fitness = {AvgFitness, StdFitness, MinFitness, MaxFitness},
+		innovation_factor = UpdatedInnovationFactor
+	},
+	genotype:write(UpdatedSpecies).
 
 calculate_species_fitness(SpeciesId) ->
 	Species = genotype:dirty_read({species, SpeciesId}),

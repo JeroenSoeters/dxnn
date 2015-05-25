@@ -149,6 +149,9 @@ mutate_population_test_(_) ->
 	{atomic, _} = population_monitor:mutate_population(?POPULATION, 4, competition, FakeTimeProvider),
 
 	exit(GeneratorPid, normal),
+	
+	Species1 = find_species(?SPECIES1),
+	Species2 = find_species(?SPECIES2),
 
 	[?_assertNot(agent_exists(?AGENT1)),
 	 ?_assert(agent_exists(?AGENT2)),
@@ -161,7 +164,20 @@ mutate_population_test_(_) ->
 	 ?_assert(agent_exists(?AGENT9)),
 	 ?_assert(agent_exists(?AGENT10)),
 	 ?_assert(agent_exists(?AGENT11)),
-	 ?_assert(agent_exists(?AGENT12))].
+	 ?_assert(agent_exists(?AGENT12)),
+	 ?_assert(agent_exists(?AGENT13)),
+	 ?_assertEqual(
+		sets:from_list([?AGENT2, ?AGENT4, ?AGENT9, ?AGENT10]), 
+		sets:from_list(Species1#species.agent_ids)),
+	 ?_assertEqual(
+		sets:from_list([?AGENT7, ?AGENT11, ?AGENT12, ?AGENT13]), 
+		sets:from_list(Species2#species.agent_ids)),
+	 ?_assertEqual([?AGENT2, ?AGENT4], Species1#species.champion_ids),
+	 ?_assertEqual([?AGENT7, ?AGENT6], Species2#species.champion_ids),
+	 ?_assertEqual({14.75, 10.256095748383007, 4, 25}, Species1#species.fitness),
+	 ?_assertEqual({134.75, 211.13428783596473, 4, 500}, Species2#species.fitness),
+	 ?_assertEqual(99, Species1#species.innovation_factor),
+	 ?_assertEqual(0, Species2#species.innovation_factor)].
 
 agent_exists(AgentId) ->
 	F = fun() ->
@@ -208,6 +224,16 @@ calculate_alotments_test_(_) ->
 	[?_assertEqual([{2.0, 4, 1, ?AGENT1}, {6.25, 25, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
 	 ?_assertEqual(8.25, EstimatedPopulationSize)].
 
+find_species(SpeciesId) ->
+	find_node(species, SpeciesId).
+
+find_node(NodeType, NodeId) ->
+	F = fun() ->
+		genotype:read({NodeType, NodeId})
+	end,
+	{atomic, Node} = mnesia:transaction(F),
+	Node.
+
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
 
@@ -222,12 +248,14 @@ create_test_population() ->
 	 #species{
 		id = ?SPECIES1,
 		population_id = ?POPULATION,
-		agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4]
+		agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4],
+		innovation_factor = 100
 	 },
 	 #species{
 		id = ?SPECIES2,
 		population_id = ?POPULATION,
-		agent_ids = [?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8]
+		agent_ids = [?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8],
+		innovation_factor = 10
 	 },
 	 #agent{
 		id = ?AGENT1,

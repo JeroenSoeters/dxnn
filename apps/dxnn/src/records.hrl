@@ -3,6 +3,6 @@
 -record(neuron, {id, generation, cortex_id, af, input_ids_plus_weights=[], output_ids=[], recursive_output_ids=[]}).
 -record(cortex, {id, agent_id, neuron_ids=[], sensor_ids=[], actuator_ids=[]}).
 -record(agent, {id, generation, population_id, species_id, cortex_id, fingerprint, constraint, evo_hist=[], fitness, innovation_factor, pattern=[]}).
--record(species, {id, population_id, fingerprint, constraint, agent_ids=[], champion_ids=[], avg_fitness, innovation_factor}).
+-record(species, {id, population_id, fingerprint, constraint, agent_ids=[], champion_ids=[], fitness, innovation_factor}).
 -record(population, {id, polis_id, species_ids=[], morphologies=[], innovation_factor}).
 -record(constraint, {morphology=xor_mimic, neural_afs=[tanh, cos, gauss, abs]}).
