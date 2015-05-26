@@ -150,7 +150,17 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 						cycle_acc = UpdatedCycleAcc,
 						time_acc = UpdatedTimeAcc
 					},
-					{stop, normal, UpdatedState}
+					{stop, normal, UpdatedState};
+				pause ->
+					io:format("Population Monitor has paused.~n"),
+					UpdatedState = State#state{
+						agents_left = 0,
+						pop_gen = UpdatedPopGen,
+						eval_acc = UpdatedEvalAcc,
+						cycle_acc = UpdatedCycleAcc,
+						time_acc = UpdatedTimeAcc
+					},
+					{noreply, UpdatedState}
 			end;
 		false ->
 			UpdatedActiveAgentIdsAndPids = lists:keydelete(AgentId, 1, State#state.active_agent_ids_and_pids),
