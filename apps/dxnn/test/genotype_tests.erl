@@ -13,6 +13,7 @@ construct_and_clone_test() ->
 		cleanup_agents(AgentId, CloneId),
 		?assert(Agent#agent.fingerprint == Clone#agent.fingerprint)
 	end,
+	mnesia:transaction(F),
 	polis:stop().
 
 construct_and_clone_agent(AgentId, CloneId) ->

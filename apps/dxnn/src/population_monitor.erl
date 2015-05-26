@@ -1,14 +1,15 @@
 -module(population_monitor).
 -include("records.hrl").
--include_lib("eunit/include/eunit.hrl").
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
 -export([init/1, handle_call/3, handle_cast/2, extract_agent_ids/2, handle_info/2, terminate/2, code_change/3]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
-%-behaviour(gen_server).
-% exporting just for tests?
--export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4, best_fitness/1]).
+-behaviour(gen_server).
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-export([calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4, best_fitness/1]).
+-endif.
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -308,7 +309,7 @@ competition(SortedAgentSummaries, PopulationLimit, NeuralEnergyCost, TimeProvide
 
 gather_survivors(Alotments, Normalizer, TimeProvider) ->
 	gather_survivors(Alotments, Normalizer, TimeProvider, []).
-gather_survivors([{MutantAlotment, Fitness, TotalNeurons, AgentId}|Alotments], Normalizer, TimeProvider, Acc) ->
+gather_survivors([{MutantAlotment, _Fitness, _TotalNeurons, AgentId}|Alotments], Normalizer, TimeProvider, Acc) ->
 	NormalizedMutantAlotment = round(MutantAlotment/Normalizer),
 	io:format("Agent_Id:~p Normalized MutantAlotment:~p~n", [AgentId, NormalizedMutantAlotment]),
 	SurvivorAgentIds = case NormalizedMutantAlotment >= 1 of

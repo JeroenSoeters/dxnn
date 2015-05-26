@@ -102,11 +102,11 @@ init_test_(_) ->
 	 ?_assertEqual(0, State#state.time_acc)].
 
 stop_population_monitor_test_(_) ->
-	DummyAgent = fun() -> receive {Pid, terminate} -> ok end end,
+	DummyAgent = fun() -> receive {_Pid, terminate} -> ok end end,
 	Agent1Pid = spawn(DummyAgent),
 	Agent2Pid = spawn(DummyAgent),
 
-	{stop, normal, State} = population_monitor:handle_call(
+	{stop, normal, _State} = population_monitor:handle_call(
 		{stop, normal},
 		self(),
 		#state{

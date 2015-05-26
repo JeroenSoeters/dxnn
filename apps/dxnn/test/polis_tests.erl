@@ -10,7 +10,7 @@ reset_polis_test() ->
 	?assertEqual(ok, polis:reset()).
 
 start_stop_polis_test() ->
-	{Flag, Pid} = polis:start(),
+	{Flag, _Pid} = polis:start(),
 	?assertEqual(ok, Flag),
 	?assertEqual(ok, polis:stop()).
 
