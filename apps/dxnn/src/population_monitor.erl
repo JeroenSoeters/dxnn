@@ -4,7 +4,7 @@
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
--export([init/1, handle_call/3, handle_cast/2, extract_agent_ids/2]).
+-export([init/1, handle_call/3, handle_cast/2, extract_agent_ids/2, handle_info/2, terminate/2, code_change/3]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
@@ -195,6 +195,9 @@ terminate(Reason, State) ->
 			OpMode = State#state.op_mode,
 			io:format("******** Population_Monitor:~p shut down with Reason:~p OpTag:~p, while in OpMode:~p~n", [PopulationId, Reason, OpTag, OpMode])
 	end.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 extract_agent_ids(PopulationId, AgentType) ->
 	Population = genotype:dirty_read({population, PopulationId}),
