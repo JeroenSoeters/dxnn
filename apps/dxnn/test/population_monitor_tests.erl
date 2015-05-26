@@ -5,14 +5,14 @@
 -define(POPULATION, {p1, population}).
 -define(SPECIES1, {s1, species}).
 -define(SPECIES2, {s2, species}).
--define(AGENT1, {a1, agent}).
--define(AGENT2, {a2, agent}).
--define(AGENT3, {a3, agent}).
--define(AGENT4, {a4, agent}).
--define(AGENT5, {a5, agent}).
--define(AGENT6, {a6, agent}).
--define(AGENT7, {a7, agent}).
--define(AGENT8, {a8, agent}).
+-define(AGENT1, {1, agent}).
+-define(AGENT2, {2, agent}).
+-define(AGENT3, {3, agent}).
+-define(AGENT4, {4, agent}).
+-define(AGENT5, {5, agent}).
+-define(AGENT6, {6, agent}).
+-define(AGENT7, {7, agent}).
+-define(AGENT8, {8, agent}).
 % this is quite brittle as this test data is tightly coupled to the implementation,
 % should be fixed later, maybe by just mocking genotype.
 -define(AGENT9, {9.0, agent}).
@@ -29,7 +29,7 @@
 -define(CORTEX7, {c7, cortex}).
 -define(CORTEX8, {c8, cortex}).
 
--record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm}).
+-record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm, population_limit, time_provider}).
 
 population_monitor_test_() ->
 	{foreach,
@@ -37,12 +37,14 @@ population_monitor_test_() ->
 	 fun teardown/1,
 	 [fun ?MODULE:init_test_/1,
 	  fun ?MODULE:an_agent_terminated_test_/1,
+	  fun ?MODULE:last_agent_terminated_then_continue_end_condition_not_reached_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
 	  fun ?MODULE:calculate_alotments_test_/1,
 	  fun ?MODULE:calculate_species_fitness_test_/1,
-	  fun ?MODULE:mutate_population_test_/1]}.
+	  fun ?MODULE:mutate_population_test_/1,
+	  fun ?MODULE:best_fitness_test_/1]}.
 
 %% ===================================================================
 %% Setup and teardown
@@ -111,20 +113,51 @@ an_agent_terminated_test_(_) ->
 	 ?_assertEqual(4, State#state.time_acc)].
 	
 last_agent_terminated_then_continue_end_condition_not_reached_test_(_) ->
+	% Mock exoself:start/1 to just return an incrementing process id as we don't want to test the exoself here
+	% but just test the population monitor in isolation.
+	meck:sequence(exoself, start, 1, [9, 10, 11, 12, 13, 14, 15, 16]),
+
+	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
+
+	FakeTimeProvider = fun() -> {0, 1/generate_number(GeneratorPid), 0} end,
+
 	{noreply, State} = population_monitor:handle_cast(
-		{?AGENT1, terminated, 100, 1, 1, 1},
+		{?AGENT1, terminated, 4, 5, 6, 7},
 		#state{
-			active_agent_ids_and_pids = [{?AGENT1, 1}, {?AGENT2, 2}, {?AGENT3, 3}],
-			agents_left = 3,
+			op_tag = continue,
+			pop_gen = 0,
+			population_id = ?POPULATION,
+			agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4, ?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8],
+			total_agents = 8,
+			active_agent_ids_and_pids = [{?AGENT1, 1}],
+			agents_left = 1,
 			eval_acc = 1,
 			cycle_acc = 2,
 			time_acc = 3,
-			selection_algorithm = competition
+			selection_algorithm = competition,
+			population_limit = 4,
+			time_provider = FakeTimeProvider
 		}),
+
+	exit(GeneratorPid, normal),
 	
-	not_implemented.
+	[?_assertEqual(
+		ordsets:from_list([{?AGENT2, 16}, {?AGENT4, 13}, {?AGENT7, 9}, {?AGENT9, 14}, {?AGENT10, 15}, {?AGENT11, 10}, {?AGENT12, 11}, {?AGENT13, 12}]),
+		ordsets:from_list(State#state.active_agent_ids_and_pids)),
+	 ?_assertEqual(8, State#state.total_agents),
+	 ?_assertEqual(8, State#state.agents_left),
+	 ?_assertEqual(
+		ordsets:from_list([?AGENT2, ?AGENT4, ?AGENT7, ?AGENT9, ?AGENT10, ?AGENT11, ?AGENT12, ?AGENT13]),
+		ordsets:from_list(State#state.agent_ids)),
+	 ?_assertEqual(1, State#state.pop_gen),
+	 ?_assertEqual(6, State#state.eval_acc),
+	 ?_assertEqual(8, State#state.cycle_acc),
+	 ?_assertEqual(10, State#state.time_acc)].
 
 last_agent_terminated_then_continue_end_condition_reached_test_(_) ->
+	%{noreply, State} = population_monitor:handle_cast(
+	%	{		
+	%	})
 	not_implemented.
 
 last_agent_terminated_then_pause_test_(_) ->
@@ -132,6 +165,11 @@ last_agent_terminated_then_pause_test_(_) ->
 
 last_agent_terminated_then_done_test_(_) ->
 	not_implemented.
+
+best_fitness_test_(_) ->
+	BestFitness = population_monitor:best_fitness(?POPULATION),
+
+	?_assertEqual(5, BestFitness).
 
 calculate_species_fitness_test_(_) ->
 	{Average, StandardDeviation, Minimum, Maximum} = population_monitor:calculate_species_fitness(?SPECIES2),
@@ -249,13 +287,15 @@ create_test_population() ->
 		id = ?SPECIES1,
 		population_id = ?POPULATION,
 		agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4],
-		innovation_factor = 100
+		innovation_factor = 100,
+		fitness = {2, 2, 2, 2}
 	 },
 	 #species{
 		id = ?SPECIES2,
 		population_id = ?POPULATION,
 		agent_ids = [?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8],
-		innovation_factor = 10
+		innovation_factor = 10,
+		fitness = {5, 5, 5, 5}
 	 },
 	 #agent{
 		id = ?AGENT1,

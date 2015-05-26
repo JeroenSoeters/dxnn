@@ -8,7 +8,7 @@
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
--export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4]).
+-export([extract_agent_ids/2, calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4, best_fitness/1]).
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
@@ -27,8 +27,7 @@
 -define(GEN_UID, genotype:generate_unique_id()).
 -define(CHAMPION_COUNT_STEP, 500).
 -define(FITNESS_GOAL, inf).
--record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm}).
-
+-record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm, population_limit, time_provider}).
 start_link(StartParameters) ->
 	gen_server:start_link(?MODULE, StartParameters, []).
 
@@ -107,17 +106,35 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 	UpdatedTimeAcc = State#state.time_acc + Time,
 	case (AgentsLeft - 1) =< 0 of
 		true ->
-			% mutate population
-			% UpdatedGeneration ++
-			% when continue...
-				% read species
-				% foreach species read fitness
-				% calculate best fitness
-				% when stopping condition not reached...
-					% extract agent ids
-					% update agent ids and pids by summoning agents
-					% update state
-					{noreply, State};
+			{atomic, _} = mutate_population(PopulationId, State#state.population_limit, competition, State#state.time_provider),
+			UpdatedPopGen = State#state.pop_gen + 1,
+			io:format("Population Generation:~p Ended.~n~n~n", [UpdatedPopGen]),
+			case OpTag of 
+				continue ->
+					% read species
+					% foreach species read fitness
+					% calculate best fitness
+					case (UpdatedPopGen >= ?GENERATION_LIMIT) or (State#state.eval_acc >= ?EVALUATIONS_LIMIT) or (best_fitness(PopulationId) > ?FITNESS_GOAL) of
+						true ->
+							not_implemented;
+						false ->
+							% update agent ids and pids by summoning agents
+							AgentIds = extract_agent_ids(PopulationId, all),
+							ActiveAgentIdsAndPids = summon_agents(OpMode, AgentIds),
+							TotalAgents = length(AgentIds),
+							UpdatedState = State#state{
+								active_agent_ids_and_pids = ActiveAgentIdsAndPids,
+								agent_ids = AgentIds,
+								total_agents = TotalAgents,
+								agents_left = TotalAgents,
+								pop_gen = UpdatedPopGen,
+								eval_acc = UpdatedEvalAcc,
+								cycle_acc = UpdatedCycleAcc,
+								time_acc = UpdatedTimeAcc
+							},
+							{noreply, UpdatedState}
+					end
+			end;
 		false ->
 			UpdatedActiveAgentIdsAndPids = lists:keydelete(AgentId, 1, State#state.active_agent_ids_and_pids),
 			{noreply, State#state{ 
@@ -128,6 +145,12 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 				time_acc = UpdatedTimeAcc
 			}}
 	end.
+
+best_fitness(PopulationId) ->
+	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
+	FitnessScores = [(genotype:dirty_read({species, SpeciesId}))#species.fitness || SpeciesId <- SpeciesIds],
+	?debugFmt("\nFitness scores: ~p\n", [SpeciesIds]),
+	lists:nth(1, lists:reverse(lists:sort([MaxFitness || {_, _, _, MaxFitness} <- FitnessScores]))).
 
 mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(PopulationId),
