@@ -41,6 +41,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:last_agent_terminated_then_continue_end_condition_reached_test_/1,
 	  fun ?MODULE:last_agent_terminated_then_done_test_/1,
 	  fun ?MODULE:last_agent_terminated_then_pause_test_/1,
+	  fun ?MODULE:pause_population_monitor_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
@@ -250,6 +251,11 @@ last_agent_terminated_then_pause_test_(_) ->
 	 ?_assertEqual(6, State#state.eval_acc),
 	 ?_assertEqual(8, State#state.cycle_acc),
 	 ?_assertEqual(10, State#state.time_acc)].
+
+pause_population_monitor_test_(_) ->
+	{noreply, State} = population_monitor:handle_cast({op_tag, pause}, #state{op_tag = continue}),
+
+	?_assertEqual(pause, State#state.op_tag).
 
 best_fitness_test_(_) ->
 	BestFitness = population_monitor:best_fitness(?POPULATION),

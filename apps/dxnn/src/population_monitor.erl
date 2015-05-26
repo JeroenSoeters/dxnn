@@ -174,14 +174,7 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 	end;
 
 handle_cast({op_tag,pause}, State) when State#state.op_tag == continue ->
-	%UpdatedState = State#state{
-	%	agents_left = 0,
-	%	pop_gen = UpdatedPopGen,
-	%	eval_acc = UpdatedEvalAcc,
-	%	cycle_acc = UpdatedCycleAcc,
-	%	time_acc = UpdatedTimeAcc
-	%},
-	{noreply, State}.
+	{noreply, State#state{op_tag = pause}}.
 
 best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
