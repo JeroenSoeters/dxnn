@@ -140,7 +140,17 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 								time_acc = UpdatedTimeAcc
 							},
 							{noreply, UpdatedState}
-					end
+					end;
+				done ->
+					io:format("Shutting down Population Monitor~n"),
+					UpdatedState = State#state{
+						agents_left = 0,
+						pop_gen = UpdatedPopGen,
+						eval_acc = UpdatedEvalAcc,
+						cycle_acc = UpdatedCycleAcc,
+						time_acc = UpdatedTimeAcc
+					},
+					{stop, normal, UpdatedState}
 			end;
 		false ->
 			UpdatedActiveAgentIdsAndPids = lists:keydelete(AgentId, 1, State#state.active_agent_ids_and_pids),
@@ -151,7 +161,17 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 				cycle_acc = UpdatedCycleAcc,
 				time_acc = UpdatedTimeAcc
 			}}
-	end.
+	end;
+
+handle_cast({op_tag,pause}, State) when State#state.op_tag == continue ->
+	%UpdatedState = State#state{
+	%	agents_left = 0,
+	%	pop_gen = UpdatedPopGen,
+	%	eval_acc = UpdatedEvalAcc,
+	%	cycle_acc = UpdatedCycleAcc,
+	%	time_acc = UpdatedTimeAcc
+	%},
+	{noreply, State}.
 
 best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
