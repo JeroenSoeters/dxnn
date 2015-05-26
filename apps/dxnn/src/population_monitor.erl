@@ -77,6 +77,15 @@ handle_call({stop, normal}, _From, State) ->
 handle_call({stop, shutdown}, _From, State) ->
 	{stop, shutdown, State}.
 
+handle_cast({init,InitState},_State)->
+	{noreply,InitState};
+
+handle_cast({stop,normal},State)->
+	{stop, normal,State};
+
+handle_cast({stop,shutdown},State)->
+	{stop, shutdown, State};
+
 handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State) 
 	when State#state.selection_algorithm == competition ->
 	PopulationId = State#state.population_id,
@@ -172,6 +181,20 @@ handle_cast({op_tag,continue}, State) when State#state.op_tag == pause ->
 		op_tag = continue
 	},
 	{noreply, UpdatedState}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(Reason, State) ->
+	case State of
+		[] ->
+			io:format("******** Population_Monitor shut down with Reason:~p, with State: []~n",[Reason]);
+		_ ->
+			PopulationId = State#state.population_id,
+			OpTag = State#state.op_tag,
+			OpMode = State#state.op_mode,
+			io:format("******** Population_Monitor:~p shut down with Reason:~p OpTag:~p, while in OpMode:~p~n", [PopulationId, Reason, OpTag, OpMode])
+	end.
 
 extract_agent_ids(PopulationId, AgentType) ->
 	Population = genotype:dirty_read({population, PopulationId}),
