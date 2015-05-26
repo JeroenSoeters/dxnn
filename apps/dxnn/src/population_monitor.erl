@@ -4,7 +4,7 @@
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
--export([init/1, handle_cast/2, extract_agent_ids/2]).
+-export([init/1, handle_call/3, handle_cast/2, extract_agent_ids/2]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 %-behaviour(gen_server).
 % exporting just for tests?
@@ -69,31 +69,10 @@ init(Parameters) ->
 	},
 	{ok, State}.
 
-extract_agent_ids(PopulationId, AgentType) ->
-	Population = genotype:dirty_read({population, PopulationId}),
-	SpeciesIds = Population#population.species_ids,
-	case AgentType of
-		champion ->
-			not_implemented;
-		all ->
-			extract_all_agent_ids(SpeciesIds)
-	end.
-
-extract_all_agent_ids(SpeciesIds) ->
-	extract_all_agent_ids(SpeciesIds, []).
-extract_all_agent_ids([SpeciesId|SpeciesIds], Acc) ->
-	Species = genotype:dirty_read({species, SpeciesId}),
-	extract_all_agent_ids(SpeciesIds, lists:append(Species#species.agent_ids, Acc));
-extract_all_agent_ids([], Acc) ->
-	Acc.
-
-summon_agents(OpMode, AgentIds) ->
-	summon_agents(OpMode, AgentIds, []).
-summon_agents(OpMode, [AgentId|AgentIds], Acc) ->
-	Pid = exoself:start(AgentId),
-	summon_agents(OpMode, AgentIds, [{AgentId, Pid}|Acc]);
-summon_agents(_OpMode, [], Acc) ->
-	Acc.
+handle_call({stop, normal}, _From, State) ->
+	ActiveAgentIdsAndPids = State#state.active_agent_ids_and_pids,
+	[Pid ! {self(),terminate} || {_, Pid} <- ActiveAgentIdsAndPids],
+	{stop, normal, State}.
 
 handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State) 
 	when State#state.selection_algorithm == competition ->
@@ -190,6 +169,32 @@ handle_cast({op_tag,continue}, State) when State#state.op_tag == pause ->
 		op_tag = continue
 	},
 	{noreply, UpdatedState}.
+
+extract_agent_ids(PopulationId, AgentType) ->
+	Population = genotype:dirty_read({population, PopulationId}),
+	SpeciesIds = Population#population.species_ids,
+	case AgentType of
+		champion ->
+			not_implemented;
+		all ->
+			extract_all_agent_ids(SpeciesIds)
+	end.
+
+extract_all_agent_ids(SpeciesIds) ->
+	extract_all_agent_ids(SpeciesIds, []).
+extract_all_agent_ids([SpeciesId|SpeciesIds], Acc) ->
+	Species = genotype:dirty_read({species, SpeciesId}),
+	extract_all_agent_ids(SpeciesIds, lists:append(Species#species.agent_ids, Acc));
+extract_all_agent_ids([], Acc) ->
+	Acc.
+
+summon_agents(OpMode, AgentIds) ->
+	summon_agents(OpMode, AgentIds, []).
+summon_agents(OpMode, [AgentId|AgentIds], Acc) ->
+	Pid = exoself:start(AgentId),
+	summon_agents(OpMode, AgentIds, [{AgentId, Pid}|Acc]);
+summon_agents(_OpMode, [], Acc) ->
+	Acc.
 
 best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,

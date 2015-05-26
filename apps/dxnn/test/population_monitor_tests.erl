@@ -43,6 +43,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:last_agent_terminated_then_pause_test_/1,
 	  fun ?MODULE:pause_population_monitor_test_/1,
 	  fun ?MODULE:resume_population_monitor_test_/1,
+	  fun ?MODULE:stop_population_monitor_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
@@ -275,6 +276,21 @@ resume_population_monitor_test_(_) ->
 		ordsets:from_list(State#state.active_agent_ids_and_pids)),
 	 ?_assertEqual(8, State#state.total_agents),
 	 ?_assertEqual(continue, State#state.op_tag)].
+
+stop_population_monitor_test_(_) ->
+	DummyAgent = fun() -> receive {Pid, terminate} -> ok end end,
+	Agent1Pid = spawn(DummyAgent),
+	Agent2Pid = spawn(DummyAgent),
+
+	{stop, normal, State} = population_monitor:handle_call(
+		{stop, normal},
+		self(),
+		#state{
+			active_agent_ids_and_pids = [{?AGENT1, Agent1Pid}, {?AGENT2, Agent2Pid}]
+		}),
+
+	[?_assertNot(is_process_alive(Agent1Pid)),
+	 ?_assertNot(is_process_alive(Agent2Pid))].
 
 best_fitness_test_(_) ->
 	BestFitness = population_monitor:best_fitness(?POPULATION),
