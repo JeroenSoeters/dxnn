@@ -44,6 +44,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:pause_population_monitor_test_/1,
 	  fun ?MODULE:resume_population_monitor_test_/1,
 	  fun ?MODULE:stop_population_monitor_test_/1,
+	  fun ?MODULE:shutdown_population_monitor_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
@@ -291,6 +292,12 @@ stop_population_monitor_test_(_) ->
 
 	[?_assertNot(is_process_alive(Agent1Pid)),
 	 ?_assertNot(is_process_alive(Agent2Pid))].
+
+shutdown_population_monitor_test_(_) ->
+	State = #state{},
+
+	Result = population_monitor:handle_call({stop, shutdown}, self(),  State),
+	?_assertEqual({stop, shutdown, State}, Result). 
 
 best_fitness_test_(_) ->
 	BestFitness = population_monitor:best_fitness(?POPULATION),

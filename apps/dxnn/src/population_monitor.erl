@@ -72,7 +72,10 @@ init(Parameters) ->
 handle_call({stop, normal}, _From, State) ->
 	ActiveAgentIdsAndPids = State#state.active_agent_ids_and_pids,
 	[Pid ! {self(),terminate} || {_, Pid} <- ActiveAgentIdsAndPids],
-	{stop, normal, State}.
+	{stop, normal, State};
+
+handle_call({stop, shutdown}, _From, State) ->
+	{stop, shutdown, State}.
 
 handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State) 
 	when State#state.selection_algorithm == competition ->
