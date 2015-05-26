@@ -38,6 +38,7 @@ population_monitor_test_() ->
 	 [fun ?MODULE:init_test_/1,
 	  fun ?MODULE:an_agent_terminated_test_/1,
 	  fun ?MODULE:last_agent_terminated_then_continue_end_condition_not_reached_test_/1,
+	  fun ?MODULE:last_agent_terminated_then_continue_end_condition_reached_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
@@ -155,10 +156,40 @@ last_agent_terminated_then_continue_end_condition_not_reached_test_(_) ->
 	 ?_assertEqual(10, State#state.time_acc)].
 
 last_agent_terminated_then_continue_end_condition_reached_test_(_) ->
-	%{noreply, State} = population_monitor:handle_cast(
-	%	{		
-	%	})
-	not_implemented.
+	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
+
+	FakeTimeProvider = fun() -> {0, 1/generate_number(GeneratorPid), 0} end,
+
+	{stop, normal, State} = population_monitor:handle_cast(
+		{?AGENT1, terminated, 4, 5, 6, 7},
+		#state{
+			op_tag = continue,
+			pop_gen = 100, % triggers ending condition
+			population_id = ?POPULATION,
+			agent_ids = [?AGENT1, ?AGENT2, ?AGENT3, ?AGENT4, ?AGENT5, ?AGENT6, ?AGENT7, ?AGENT8],
+			total_agents = 8,
+			active_agent_ids_and_pids = [{?AGENT1, 1}],
+			agents_left = 1,
+			eval_acc = 1,
+			cycle_acc = 2,
+			time_acc = 3,
+			selection_algorithm = competition,
+			population_limit = 4,
+			time_provider = FakeTimeProvider
+		}),
+
+	exit(GeneratorPid, normal),
+	
+	[?_assertEqual([{?AGENT1, 1}], State#state.active_agent_ids_and_pids),
+	 ?_assertEqual(8, State#state.total_agents),
+	 ?_assertEqual(8, State#state.agents_left),
+	 ?_assertEqual(
+		ordsets:from_list([?AGENT2, ?AGENT4, ?AGENT7, ?AGENT9, ?AGENT10, ?AGENT11, ?AGENT12, ?AGENT13]),
+		ordsets:from_list(State#state.agent_ids)),
+	 ?_assertEqual(101, State#state.pop_gen),
+	 ?_assertEqual(6, State#state.eval_acc),
+	 ?_assertEqual(8, State#state.cycle_acc),
+	 ?_assertEqual(10, State#state.time_acc)].
 
 last_agent_terminated_then_pause_test_(_) ->
 	not_implemented.

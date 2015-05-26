@@ -111,14 +111,21 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 			io:format("Population Generation:~p Ended.~n~n~n", [UpdatedPopGen]),
 			case OpTag of 
 				continue ->
-					% read species
-					% foreach species read fitness
-					% calculate best fitness
 					case (UpdatedPopGen >= ?GENERATION_LIMIT) or (State#state.eval_acc >= ?EVALUATIONS_LIMIT) or (best_fitness(PopulationId) > ?FITNESS_GOAL) of
 						true ->
-							not_implemented;
+							AgentIds = extract_agent_ids(PopulationId, all),
+							TotalAgents = length(AgentIds),
+							UpdatedState = State#state{
+								agent_ids = AgentIds,
+								total_agents = TotalAgents,
+								agents_left = TotalAgents,
+								pop_gen = UpdatedPopGen,
+								eval_acc = UpdatedEvalAcc,
+								cycle_acc = UpdatedCycleAcc,
+								time_acc = UpdatedTimeAcc
+							},
+							{stop, normal, UpdatedState};
 						false ->
-							% update agent ids and pids by summoning agents
 							AgentIds = extract_agent_ids(PopulationId, all),
 							ActiveAgentIdsAndPids = summon_agents(OpMode, AgentIds),
 							TotalAgents = length(AgentIds),
@@ -149,7 +156,6 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
 	FitnessScores = [(genotype:dirty_read({species, SpeciesId}))#species.fitness || SpeciesId <- SpeciesIds],
-	?debugFmt("\nFitness scores: ~p\n", [SpeciesIds]),
 	lists:nth(1, lists:reverse(lists:sort([MaxFitness || {_, _, _, MaxFitness} <- FitnessScores]))).
 
 mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
