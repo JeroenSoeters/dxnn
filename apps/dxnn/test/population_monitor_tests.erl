@@ -101,6 +101,27 @@ init_test_(_) ->
 	 ?_assertEqual(0, State#state.cycle_acc),
 	 ?_assertEqual(0, State#state.time_acc)].
 
+stop_population_monitor_test_(_) ->
+	DummyAgent = fun() -> receive {Pid, terminate} -> ok end end,
+	Agent1Pid = spawn(DummyAgent),
+	Agent2Pid = spawn(DummyAgent),
+
+	{stop, normal, State} = population_monitor:handle_call(
+		{stop, normal},
+		self(),
+		#state{
+			active_agent_ids_and_pids = [{?AGENT1, Agent1Pid}, {?AGENT2, Agent2Pid}]
+		}),
+
+	[?_assertNot(is_process_alive(Agent1Pid)),
+	 ?_assertNot(is_process_alive(Agent2Pid))].
+
+shutdown_population_monitor_test_(_) ->
+	State = #state{},
+
+	Result = population_monitor:handle_call({stop, shutdown}, self(),  State),
+	?_assertEqual({stop, shutdown, State}, Result). 
+
 an_agent_terminated_test_(_) ->
 	{noreply, State} = population_monitor:handle_cast(
 		{?AGENT1, terminated, 100, 1, 1, 1},
@@ -277,27 +298,6 @@ resume_population_monitor_test_(_) ->
 		ordsets:from_list(State#state.active_agent_ids_and_pids)),
 	 ?_assertEqual(8, State#state.total_agents),
 	 ?_assertEqual(continue, State#state.op_tag)].
-
-stop_population_monitor_test_(_) ->
-	DummyAgent = fun() -> receive {Pid, terminate} -> ok end end,
-	Agent1Pid = spawn(DummyAgent),
-	Agent2Pid = spawn(DummyAgent),
-
-	{stop, normal, State} = population_monitor:handle_call(
-		{stop, normal},
-		self(),
-		#state{
-			active_agent_ids_and_pids = [{?AGENT1, Agent1Pid}, {?AGENT2, Agent2Pid}]
-		}),
-
-	[?_assertNot(is_process_alive(Agent1Pid)),
-	 ?_assertNot(is_process_alive(Agent2Pid))].
-
-shutdown_population_monitor_test_(_) ->
-	State = #state{},
-
-	Result = population_monitor:handle_call({stop, shutdown}, self(),  State),
-	?_assertEqual({stop, shutdown, State}, Result). 
 
 best_fitness_test_(_) ->
 	BestFitness = population_monitor:best_fitness(?POPULATION),
