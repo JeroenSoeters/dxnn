@@ -42,6 +42,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:last_agent_terminated_then_done_test_/1,
 	  fun ?MODULE:last_agent_terminated_then_pause_test_/1,
 	  fun ?MODULE:pause_population_monitor_test_/1,
+	  fun ?MODULE:resume_population_monitor_test_/1,
 	  fun ?MODULE:extract_all_agent_ids_test_/1,
 	  fun ?MODULE:calculate_neural_energy_cost_test_/1,
 	  fun ?MODULE:construct_agent_summaries_test_/1,
@@ -256,6 +257,24 @@ pause_population_monitor_test_(_) ->
 	{noreply, State} = population_monitor:handle_cast({op_tag, pause}, #state{op_tag = continue}),
 
 	?_assertEqual(pause, State#state.op_tag).
+
+resume_population_monitor_test_(_) ->
+	% Mock exoself:start/1 to just return an incrementing process id as we don't want to test the exoself here
+	% but just test the population monitor in isolation.
+	meck:sequence(exoself, start, 1, [1, 2, 3, 4, 5, 6, 7, 8]),
+	
+	{noreply, State} = population_monitor:handle_cast(
+		{op_tag, continue}, 
+		#state{
+			op_tag = pause,
+			population_id = ?POPULATION
+		}),
+
+	[?_assertEqual(
+		ordsets:from_list([{?AGENT1, 5}, {?AGENT2, 6}, {?AGENT3, 7}, {?AGENT4, 8}, {?AGENT5, 1}, {?AGENT6, 2}, {?AGENT7, 3}, {?AGENT8, 4}]),
+		ordsets:from_list(State#state.active_agent_ids_and_pids)),
+	 ?_assertEqual(8, State#state.total_agents),
+	 ?_assertEqual(continue, State#state.op_tag)].
 
 best_fitness_test_(_) ->
 	BestFitness = population_monitor:best_fitness(?POPULATION),

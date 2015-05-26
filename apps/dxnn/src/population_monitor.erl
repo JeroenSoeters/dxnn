@@ -174,7 +174,22 @@ handle_cast({AgentId, terminated, Fitness, Evals, Cycles, Time}, State)
 	end;
 
 handle_cast({op_tag,pause}, State) when State#state.op_tag == continue ->
-	{noreply, State#state{op_tag = pause}}.
+	{noreply, State#state{op_tag = pause}};
+
+handle_cast({op_tag,continue}, State) when State#state.op_tag == pause ->
+	PopulationId = State#state.population_id,
+	OpMode = State#state.op_mode,
+	AgentIds = extract_agent_ids(PopulationId, all),
+	ActiveAgentIdsAndPids = summon_agents(OpMode, AgentIds),
+	TotalAgents = length(AgentIds),
+	UpdatedState = State#state{
+		active_agent_ids_and_pids = ActiveAgentIdsAndPids,
+		agent_ids = AgentIds,
+		total_agents = TotalAgents,
+		agents_left = TotalAgents,
+		op_tag = continue
+	},
+	{noreply, UpdatedState}.
 
 best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
