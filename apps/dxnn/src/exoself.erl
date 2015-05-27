@@ -1,7 +1,18 @@
 -module(exoself).
 -compile(export_all).
 -include("records.hrl").
+-record(state,{file_name, genotype, ids_and_pid, cortex_pid, sensor_pids, neuron_pids, actuator_pids, best_fitness, tot_evals, tot_cycles}). 
 -define(MAX_ATTEMPTS,50).
+
+start(AgentId) ->
+	case whereis(monitor) of
+		undefined ->
+			io:format("start(Agent_Id):: 'monitor' is not registered~n");
+		Pid ->
+			start(AgentId, Pid)
+	end.
+start(AgentId, PopulationMonitorPid) ->
+	spwan(exoself, prep, [AgentId, PopulationMonitorPid]).
 
 map() ->
 	map(ffnn).
