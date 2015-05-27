@@ -15,7 +15,7 @@
 -define(SELECTION_ALGORITHM, competition).
 -define(EFF, 0.05).
 -define(INIT_CONSTRAINTS,
-	[#constraint{morphology=Morhology, neural_afs=NeuralAfs} || Morphology <- [xor_mimic], NeuralAfs <- [[tanh]]]).
+	[#constraint{morphology=Morphology, neural_afs=NeuralAfs} || Morphology <- [xor_mimic], NeuralAfs <- [[tanh]]]).
 -define(SURVIVAL_PERCENTAGE, 0.5).
 -define(SPECIES_SIZE_LIMIT, 10).
 -define(INIT_SPECIES_SIZE, 10).
@@ -396,4 +396,28 @@ calculate_alotments([{Fitness, TotalNeurons, AgentId}|SortedAgentSummaries], Neu
 	calculate_alotments(SortedAgentSummaries, NeuralEnergyCost, [{MutantAlotment, Fitness, TotalNeurons, AgentId}|Acc], UpdatedEstimatedPopulationSizeAcc); 
 calculate_alotments([], _NeuralEnergyCost, Acc, EstimatedPopulationSize) ->
 	{lists:reverse(Acc), EstimatedPopulationSize}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test()->
+	init_population({?INIT_POPULATION_ID, ?INIT_CONSTRAINTS, ?INIT_SPECIES_SIZE, ?OP_MODE, ?SELECTION_ALGORITHM}).
+%The test/0 function starts the population monitor through init_population/1 with a set of default parameters specified by the macros of this module.
+
+init_population({PopulationId, SpeciesConstraints, SpeciesSize, OpMode, SelectionAlgorithm})->
+	random:seed(now()),
+	F = fun()->
+		case genotype:read({population,PopulationId}) of
+			undefined ->
+				create_population(PopulationId, SpeciesConstraints, SpeciesSize, fun erlang:now/0);
+			_ ->
+				delete_population(PopulationId),
+				create_population(PopulationId, SpeciesConstraints, SpeciesSize, fun erlang:now/0)
+		end
+	end,
+	Result = mnesia:transaction(F),
+	case Result of
+		{atomic,_} ->
+			population_monitor:start({OpMode, PopulationId, SelectionAlgorithm});
+		Error ->
+			io:format("******** ERROR in PopulationMonitor:~p~n", [Error])
+	end.
 	
