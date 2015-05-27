@@ -51,6 +51,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:calculate_alotments_test_/1,
 	  fun ?MODULE:calculate_species_fitness_test_/1,
 	  fun ?MODULE:create_population_test_/1,
+	  fun ?MODULE:delete_population_test_/1,
 	  fun ?MODULE:mutate_population_test_/1,
 	  fun ?MODULE:best_fitness_test_/1]}.
 
@@ -340,6 +341,13 @@ create_population_test_(_) ->
 	 ?_assertEqual(origin, Species#species.fingerprint),
 	 ?_assertEqual(#constraint{morphology=xor_mimic, neural_afs=[tanh]}, Species#species.constraint),
 	 ?_assertEqual(2, length(Species#species.agent_ids))].
+
+delete_population_test_(_) ->
+	in_transaction(fun() -> population_monitor:delete_population(?POPULATION) end),
+	
+	[?_assertEqual(undefined, find_population(?POPULATION)),
+	 ?_assertEqual(undefined, find_species(?SPECIES1)),
+	 ?_assertEqual(undefined, find_species(?SPECIES2))].
 
 mutate_population_test_(_) ->
 	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),

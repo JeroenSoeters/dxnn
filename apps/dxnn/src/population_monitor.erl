@@ -8,7 +8,7 @@
 -behaviour(gen_server).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--export([calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, create_population/4, mutate_population/4, best_fitness/1]).
+-export([calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, create_population/4, delete_population/1,  mutate_population/4, best_fitness/1]).
 -endif.
 
 % Population monitor options and parameters
@@ -258,6 +258,18 @@ create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, AgentInd
 	AgentId = {genotype:generate_unique_id(TimeProvider), agent},
 	genotype:construct_agent(SpeciesId, AgentId, SpeciesConstraint, TimeProvider),
 	create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, AgentIndex - 1, TimeProvider, [AgentId|AgentIdsAcc]).
+
+delete_population(PopulationId) ->
+	Population = genotype:dirty_read({population, PopulationId}),
+	SpecieIds = Population#population.species_ids,
+	[delete_specie(SpecieId) || SpecieId <- SpecieIds],
+	mnesia:delete({population, PopulationId}).
+	
+delete_specie(SpeciesId)->
+	Species = genotype:dirty_read({species, SpeciesId}),
+	AgentIds = Species#species.agent_ids,
+	[genotype:delete_agent(AgentId) || AgentId <- AgentIds],
+	mnesia:delete({species, SpeciesId}).
 
 mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(PopulationId),
