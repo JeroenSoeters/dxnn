@@ -3,12 +3,12 @@
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
--export([init/1, handle_call/3, handle_cast/2, extract_agent_ids/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/2, extract_agent_ids/2]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 -behaviour(gen_server).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--export([calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, mutate_population/4, best_fitness/1]).
+-export([calculate_neural_energy_cost/1, construct_agent_summaries/1, calculate_alotments/2, calculate_species_fitness/1, create_population/4, mutate_population/4, best_fitness/1]).
 -endif.
 
 % Population monitor options and parameters
@@ -53,7 +53,7 @@ init(Pid, InitState) ->
 %% ===================================================================
 
 init(Parameters) ->
-	%process_flag(trap_exit, true),
+	%rocess_flag(trap_exit, true),
 	%register(monitor, self()),
 	io:format("******** Population monitor started with parameters:~p~n", [Parameters]),
 	{OpMode, PopulationId, SelectionAlgorithm} = Parameters,
@@ -230,6 +230,34 @@ best_fitness(PopulationId) ->
 	SpeciesIds = (genotype:dirty_read({population, PopulationId}))#population.species_ids,
 	FitnessScores = [(genotype:dirty_read({species, SpeciesId}))#species.fitness || SpeciesId <- SpeciesIds],
 	lists:nth(1, lists:reverse(lists:sort([MaxFitness || {_, _, _, MaxFitness} <- FitnessScores]))).
+
+create_population(PopulationId, SpeciesConstraints, SpeciesSize, TimeProvider) ->
+	SpeciesIds = [create_species(PopulationId, SpeciesConstraint, origin, SpeciesSize, TimeProvider) 
+		|| SpeciesConstraint <- SpeciesConstraints],
+	Population = #population{
+		id = PopulationId,
+		species_ids = SpeciesIds
+	},
+	genotype:write(Population).
+
+create_species(PopulationId, SpeciesConstraint, Fingerprint, SpeciesSize, TimeProvider) ->
+	SpeciesId = genotype:generate_unique_id(TimeProvider),
+	create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, SpeciesSize, TimeProvider, []).
+create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, 0, TimeProvider, AgentIdsAcc) ->
+	io:format("Specie_Id:~p Morphology:~p~n",[SpeciesId,SpeciesConstraint#constraint.morphology]),
+	Species = #species{
+		id = SpeciesId,
+		population_id = PopulationId,
+		fingerprint = Fingerprint,
+		constraint = SpeciesConstraint,
+		agent_ids = AgentIdsAcc
+	},
+	genotype:write(Species),
+	SpeciesId;
+create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, AgentIndex, TimeProvider, AgentIdsAcc) ->
+	AgentId = {genotype:generate_unique_id(TimeProvider), agent},
+	genotype:construct_agent(SpeciesId, AgentId, SpeciesConstraint, TimeProvider),
+	create_species(PopulationId, SpeciesId, SpeciesConstraint, Fingerprint, AgentIndex - 1, TimeProvider, [AgentId|AgentIdsAcc]).
 
 mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
 	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(PopulationId),

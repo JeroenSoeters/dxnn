@@ -50,6 +50,7 @@ population_monitor_test_() ->
 	  fun ?MODULE:construct_agent_summaries_test_/1,
 	  fun ?MODULE:calculate_alotments_test_/1,
 	  fun ?MODULE:calculate_species_fitness_test_/1,
+	  fun ?MODULE:create_population_test_/1,
 	  fun ?MODULE:mutate_population_test_/1,
 	  fun ?MODULE:best_fitness_test_/1]}.
 
@@ -241,6 +242,8 @@ last_agent_terminated_then_done_test_(_) ->
 			time_provider = FakeTimeProvider
 		}),
 	
+	exit(GeneratorPid, normal),
+
 	[?_assertEqual(0, State#state.agents_left),
 	 ?_assertEqual(101, State#state.pop_gen),
 	 ?_assertEqual(6, State#state.eval_acc),
@@ -269,6 +272,8 @@ last_agent_terminated_then_pause_test_(_) ->
 			population_limit = 4,
 			time_provider = FakeTimeProvider
 		}),
+	
+	exit(GeneratorPid, normal),
 	
 	[?_assertEqual(0, State#state.agents_left),
 	 ?_assertEqual(101, State#state.pop_gen),
@@ -311,6 +316,30 @@ calculate_species_fitness_test_(_) ->
 	 ?_assertEqual(211.13428783596473, StandardDeviation),
 	 ?_assertEqual(4, Minimum),
 	 ?_assertEqual(500, Maximum)].
+
+create_population_test_(_) ->
+	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
+
+	FakeTimeProvider = fun() -> {0, 1/generate_number(GeneratorPid), 0} end,
+	
+	{atomic, _} = in_transaction(fun() -> population_monitor:create_population(
+		create_pop_test,
+		[#constraint{morphology=Morphology, neural_afs=NeuralAfs} || Morphology <- [xor_mimic], NeuralAfs <- [[tanh]]],
+		2,
+		FakeTimeProvider) end),
+	
+	exit(GeneratorPid, normal),
+	
+	Population = find_population(create_pop_test),
+	Species = find_species(9.0),
+
+	[?_assertNot(Population == undefined),
+	 ?_assertEqual([9.0], Population#population.species_ids),
+	 ?_assertNot(Species == undefined),
+	 ?_assertEqual(create_pop_test, Species#species.population_id),
+	 ?_assertEqual(origin, Species#species.fingerprint),
+	 ?_assertEqual(#constraint{morphology=xor_mimic, neural_afs=[tanh]}, Species#species.constraint),
+	 ?_assertEqual(2, length(Species#species.agent_ids))].
 
 mutate_population_test_(_) ->
 	GeneratorPid = spawn(?MODULE, sequence_generator, [9]),
@@ -394,6 +423,9 @@ calculate_alotments_test_(_) ->
 
 	[?_assertEqual([{2.0, 4, 1, ?AGENT1}, {6.25, 25, 2, ?AGENT2}], AlotmentsPlusAgentSummaries),
 	 ?_assertEqual(8.25, EstimatedPopulationSize)].
+
+find_population(PopulationId) ->
+	find_node(population, PopulationId).
 
 find_species(SpeciesId) ->
 	find_node(species, SpeciesId).
