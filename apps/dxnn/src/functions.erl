@@ -14,6 +14,29 @@ saturation(Val) ->
 			end
 	end.
 
+saturation(Val, Spread) ->
+	case Val > Spread of
+		true ->
+			Spread;
+		false ->
+			case Val < -Spread of
+				true ->
+					-Spread;
+				false ->
+					Val
+			end
+	end.
+
+scale(Xs, Min, Max) ->
+	[scale_val(X, Min, Max) || X <- Xs]. 
+scale_val(X, Min, Max) ->
+	case Max == Min of
+		true ->
+			0;
+		false ->
+			(X*2-(Max+Min))/(Max-Min)
+	end.
+
 avg(Xs) ->
 	lists:sum(Xs) / length(Xs).
 

@@ -7,6 +7,15 @@ saturation_test() ->
 	?assertEqual(800, functions:saturation(800)),
 	?assertEqual(-1000, functions:saturation(-1050)).
 
+saturation_with_spread_test() ->
+	?assertEqual(3, functions:saturation(5, 3)),
+	?assertEqual(3, functions:saturation(3, 5)),
+	?assertEqual(-3, functions:saturation(-5, 3)).
+
+scale_test() ->
+	?assertEqual([0, 0], functions:scale([2, 3], 5, 5)),
+	?assertEqual([1.0, 5.0], functions:scale([4, 8], 2, 4)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).
