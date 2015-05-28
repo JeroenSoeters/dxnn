@@ -2,6 +2,11 @@
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 
+saturation_test() ->
+	?assertEqual(1000, functions:saturation(1050)),
+	?assertEqual(800, functions:saturation(800)),
+	?assertEqual(-1000, functions:saturation(-1050)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).
