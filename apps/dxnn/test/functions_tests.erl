@@ -16,6 +16,10 @@ scale_test() ->
 	?assertEqual([0, 0], functions:scale([2, 3], 5, 5)),
 	?assertEqual([1.0, 5.0], functions:scale([4, 8], 2, 4)).
 
+scale_dzone_test() ->
+	?assertEqual(1.0, functions:scale_dzone(4, 2, 4, 0, 1)),
+	?assertEqual(0, functions:scale_dzone(4, 2, 4, 0, 6)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).

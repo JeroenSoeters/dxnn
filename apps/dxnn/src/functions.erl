@@ -37,6 +37,14 @@ scale_val(X, Min, Max) ->
 			(X*2-(Max+Min))/(Max-Min)
 	end.
 
+scale_dzone(X, Min, Max, DZMin, DZMax) ->
+	case (X > DZMin) and (X < DZMax) of
+		true ->
+			0;
+		false ->
+			scale_val(X, Min, Max)
+	end.
+
 avg(Xs) ->
 	lists:sum(Xs) / length(Xs).
 
