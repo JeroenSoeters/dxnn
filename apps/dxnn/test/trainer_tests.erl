@@ -1,7 +1,7 @@
 -module(trainer_tests).
 -include_lib("eunit/include/eunit.hrl").
 
-xor_simulation_test() ->
+xor_simulation_test_ignore() ->
 	register(benchmarker, self()),
 	trainer:go(xor_mimic, [2], 10, inf, inf),
 	receive
