@@ -84,6 +84,29 @@ absolute(X) ->
 linear(X) ->
 	X.
 
+quadratic(X) ->
+	sgn(X) * X * X.
+
+gaussian(X) ->
+	gaussian(2.71828183,X).
+
+gaussian(Const,X)->
+	V = case X > 10 of
+		true ->
+			10;
+		false ->
+			case X < -10 of
+				true ->
+					-10;
+				false ->
+					X
+			end
+	end,
+	math:pow(Const,-V*V).
+
+sqrt(X) ->
+	sgn(X) * math:sqrt(abs(X)).
+
 std(Xs) ->
 	Avg = avg(Xs),
 	std(Xs, Avg, []).

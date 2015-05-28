@@ -36,6 +36,18 @@ linear_test() ->
 	?assertEqual(1, functions:linear(1)),
 	?assertEqual(-99, functions:linear(-99)).
 
+quadratic_test() ->
+	?assertEqual(4, functions:quadratic(2)),
+	?assertEqual(-4, functions:quadratic(-2)).
+
+gaussian_test() ->
+	?assertEqual(0.36787944096289676, functions:gaussian(-1)),
+	?assertEqual(3.7200757651350987e-44, functions:gaussian(150)).
+
+sqrt_test() ->
+	?assertEqual(2.0, functions:sqrt(4)),
+	?assertEqual(-2.0, functions:sqrt(-4)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).
