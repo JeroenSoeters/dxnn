@@ -112,6 +112,23 @@ log(0) ->
 log(X) ->
 	sgn(X) * math:log(abs(X)).
 
+sigmoid(X) ->
+	V = case X > 10 of
+		true ->
+			10;
+		false ->
+			case X < -10 of
+				true ->
+					-10;
+				false ->
+					X
+			end
+	end,
+	2/(1+math:pow(2.71828183,-V))-1.
+
+sigmoid1(X) ->
+	X / (1+abs(X)).
+
 std(Xs) ->
 	Avg = avg(Xs),
 	std(Xs, Avg, []).

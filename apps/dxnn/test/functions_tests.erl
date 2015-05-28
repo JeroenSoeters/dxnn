@@ -53,6 +53,15 @@ log_test() ->
 	?assertEqual(-0.6931471805599453, functions:log(-2)),
 	?assertEqual(0.6931471805599453, functions:log(2)).
 
+sigmoid_test() ->
+	?assertEqual(-0.9999092042631098, functions:sigmoid(-15)),
+	?assertEqual(0.0, functions:sigmoid(0)),
+	?assertEqual(0.9051482537985267, functions:sigmoid(3)),
+	?assertEqual(0.9999092042631097, functions:sigmoid(25)).
+
+sigmoid1_test() ->
+	?assertEqual(0.5, functions:sigmoid1(1)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).
