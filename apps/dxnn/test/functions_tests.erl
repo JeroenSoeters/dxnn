@@ -48,6 +48,11 @@ sqrt_test() ->
 	?assertEqual(2.0, functions:sqrt(4)),
 	?assertEqual(-2.0, functions:sqrt(-4)).
 
+log_test() ->
+	?assertEqual(0, functions:log(0)),
+	?assertEqual(-0.6931471805599453, functions:log(-2)),
+	?assertEqual(0.6931471805599453, functions:log(2)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).

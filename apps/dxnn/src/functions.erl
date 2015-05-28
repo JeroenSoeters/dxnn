@@ -107,6 +107,11 @@ gaussian(Const,X)->
 sqrt(X) ->
 	sgn(X) * math:sqrt(abs(X)).
 
+log(0) ->
+	0;
+log(X) ->
+	sgn(X) * math:log(abs(X)).
+
 std(Xs) ->
 	Avg = avg(Xs),
 	std(Xs, Avg, []).
