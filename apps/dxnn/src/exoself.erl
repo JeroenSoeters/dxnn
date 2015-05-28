@@ -130,10 +130,12 @@ link_neurons([NeuronId|NeuronIds], IdsAndPids) ->
 	CortexPid = ets:lookup_element(IdsAndPids, Neuron#neuron.cortex_id, 2),
 	AFName = Neuron#neuron.af,
 	InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
-	Output_Ids = Neuron#neuron.output_ids,
-	Input_PidPs = convert_IdPs2PidPs(IdsAndPids, InputIdsPlusWeights, []),
-	Output_Pids = [ets:lookup_element(IdsAndPids, Id, 2) || Id <- Output_Ids],
-	NeuronPid ! {self(), {NeuronId, CortexPid, AFName, Input_PidPs, Output_Pids}},
+	OutputIds = Neuron#neuron.output_ids,
+	RecursiveOutputIds = Neuron#neuron.recursive_output_ids,
+	InputPidsPlusWeights = convert_IdPs2PidPs(IdsAndPids, InputIdsPlusWeights, []),
+	OutputPids = [ets:lookup_element(IdsAndPids, Id, 2) || Id <- OutputIds],
+	RecursiveOutputPids = [ets:lookup_element(IdsAndPids, Id, 2) || Id <- RecursiveOutputIds],
+	NeuronPid ! {self(), {NeuronId, CortexPid, AFName, InputPidsPlusWeights, OutputPids, RecursiveOutputPids}},
 	link_neurons(NeuronIds, IdsAndPids);
 link_neurons([], _IdsAndPids) ->
 	ok.
@@ -182,11 +184,11 @@ update_genotype(IdsAndPids, [{NeuronId, PidPs}|WeightPs]) ->
 update_genotype(_IdsAndPids, []) ->
 	ok.
 
-convert_PidPs2IdPs(IdsAndPids, [{Pid, Weights}|Input_PidPs], Acc) ->
-	convert_PidPs2IdPs(IdsAndPids, Input_PidPs, [{ets:lookup_element(IdsAndPids, Pid, 2), Weights}|Acc]);
+convert_PidPs2IdPs(IdsAndPids, [{Pid, Weights}|InputPidsPlusWeights], Acc) ->
+	convert_PidPs2IdPs(IdsAndPids, InputPidsPlusWeights, [{ets:lookup_element(IdsAndPids, Pid, 2), Weights}|Acc]);
 convert_PidPs2IdPs(_IdsAndPids, [Bias], Acc) ->
 	lists:reverse([{bias, Bias}|Acc]).
-%For every {NeuronId,PidPs} tuple the update_genotype/3 function extracts the neuron with the id: NeuronId and updates its weights. The convert_PidPs2IdPs/3 performs the conversion from PidPs to Ids of every {Pid,Weights} tuple in the Input_PidPs list. The updated Genotype is then returned back to the caller.
+%For every {NeuronId,PidPs} tuple the update_genotype/3 function extracts the neuron with the id: NeuronId and updates its weights. The convert_PidPs2IdPs/3 performs the conversion from PidPs to Ids of every {Pid,Weights} tuple in the InputPidsPlusWeights list. The updated Genotype is then returned back to the caller.
 
 terminate_phenotype(CortexPid, SensorPids, NeuronPids, ActuatorPids, ScapePids) ->
 	[Pid ! {self(), terminate} || Pid <- SensorPids], 
