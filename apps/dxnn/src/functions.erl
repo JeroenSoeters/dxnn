@@ -67,6 +67,23 @@ sgn(X) ->
 			-1
 	end.
 
+bin(X) ->
+	case X > 0 of
+		true ->
+			1;
+		false ->
+			0
+	end.
+
+multiquadratic(X) ->
+	math:pow(X * X + 0.01, 0.5).
+
+absolute(X) ->
+	abs(X).
+
+linear(X) ->
+	X.
+
 std(Xs) ->
 	Avg = avg(Xs),
 	std(Xs, Avg, []).

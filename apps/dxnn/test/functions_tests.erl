@@ -25,6 +25,17 @@ sgn_test() ->
 	?assertEqual(-1, functions:sgn(-2)),
 	?assertEqual(0, functions:sgn(0)).
 
+bin_test() ->
+	?assertEqual(0, functions:bin(-1)),
+	?assertEqual(1, functions:bin(1)).
+
+multiquadratic_test() ->
+	?assertEqual(3.0016662039607267, functions:multiquadratic(3)).
+
+linear_test() ->
+	?assertEqual(1, functions:linear(1)),
+	?assertEqual(-99, functions:linear(-99)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).
