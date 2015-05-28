@@ -1,29 +1,29 @@
 -module(functions).
 -compile(export_all).
 
-saturation(Val) ->
-	case Val > 1000 of
+saturation(X) ->
+	case X > 1000 of
 		true ->
 			1000;
 		false ->
-			case Val < -1000 of
+			case X < -1000 of
 				true ->
 					-1000;
 				false ->
-					Val
+					X
 			end
 	end.
 
-saturation(Val, Spread) ->
-	case Val > Spread of
+saturation(X, Spread) ->
+	case X > Spread of
 		true ->
 			Spread;
 		false ->
-			case Val < -Spread of
+			case X < -Spread of
 				true ->
 					-Spread;
 				false ->
-					Val
+					X
 			end
 	end.
 
@@ -45,6 +45,15 @@ scale_dzone(X, Min, Max, DZMin, DZMax) ->
 			scale_val(X, Min, Max)
 	end.
 
+tanh(X) ->
+	math:tanh(X).
+
+cos(X) ->
+	math:cos(X).
+
+sin(X) ->
+	math:sin(X).
+
 avg(Xs) ->
 	lists:sum(Xs) / length(Xs).
 
@@ -58,5 +67,3 @@ std([], _Avg, Acc) ->
 	math:sqrt(Variance).
 %avg/1 and std/1 calculate the average and the standard deviation values of the lists passed to them.
 
-tanh(Val) ->
-	math:tanh(Val).
