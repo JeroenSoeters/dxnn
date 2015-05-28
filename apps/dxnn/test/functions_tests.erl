@@ -20,6 +20,11 @@ scale_dzone_test() ->
 	?assertEqual(1.0, functions:scale_dzone(4, 2, 4, 0, 1)),
 	?assertEqual(0, functions:scale_dzone(4, 2, 4, 0, 6)).
 
+sgn_test() ->
+	?assertEqual(1, functions:sgn(2)),
+	?assertEqual(-1, functions:sgn(-2)),
+	?assertEqual(0, functions:sgn(0)).
+
 avg_test() ->
 	?assertEqual(3.0, functions:avg([1,2,3,4,5])),
 	?assertEqual(1.0, functions:avg([1,1,1])).

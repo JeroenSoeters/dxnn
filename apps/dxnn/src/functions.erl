@@ -57,6 +57,16 @@ sin(X) ->
 avg(Xs) ->
 	lists:sum(Xs) / length(Xs).
 
+sgn(0) ->
+	0;
+sgn(X) ->
+	case X > 0 of
+		true ->
+			1;
+		false ->
+			-1
+	end.
+
 std(Xs) ->
 	Avg = avg(Xs),
 	std(Xs, Avg, []).
