@@ -143,7 +143,9 @@ link_neurons([], _IdsAndPids) ->
 convert_IdPs2PidPs(_IdsAndPids, [{bias, Bias}], Acc) ->
 	lists:reverse([Bias|Acc]);
 convert_IdPs2PidPs(IdsAndPids, [{Id, Weights}|Fanin_IdPs], Acc) ->
-	convert_IdPs2PidPs(IdsAndPids, Fanin_IdPs, [{ets:lookup_element(IdsAndPids, Id, 2), Weights}|Acc]).
+	convert_IdPs2PidPs(IdsAndPids, Fanin_IdPs, [{ets:lookup_element(IdsAndPids, Id, 2), Weights}|Acc]);
+convert_IdPs2PidPs(_IdsAndPids, [], Acc) ->
+	lists:reverse(Acc).
 %Rhw link_CerebralUnits/2 converts the Ids to Pids using the created IdsAndPids ETS table. At this point all the elements are spawned, and the processes are waiting for their inital states. convert_IdPs2PidPs/3 converts the IdPs tuples into tuples that use Pids instead of Ids, such that the Neuron will know which weights are to be associated with which incoming vector signals. The last element is the bias, which is added to the list in a non tuple form. Afterwards, the list is reversed to take its proper order.
 
 link_cortex(Cortex, IdsAndPids) ->
