@@ -50,7 +50,7 @@ loop(Id, ExoselfPid, CortexPid, AF, {[Bias], MInputIdsPlusWeights}, OutputPids, 
 	[Output_PId ! {self(), forward, [Output]} || Output_PId <- OutputPids],
 	loop(Id, ExoselfPid, CortexPid, AF, {MInputIdsPlusWeights, MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, 0);
 loop(Id, ExoselfPid, CortexPid, AF, {[], MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc) ->
-	Output = neuron:AF(Acc),
+	Output = functions:AF(Acc),
 	[Output_PId ! {self(), forward, [Output]} || Output_PId <- OutputPids],
 	loop(Id, ExoselfPid, CortexPid, AF, {MInputIdsPlusWeights, MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, 0).
 

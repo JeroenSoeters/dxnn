@@ -8,6 +8,7 @@
 -define(MUTATORS, [
 	{mutate_weights, []},
 	{add_bias, []},
+	{mutate_af, []},
 	{remove_bias, []},
 	{add_outlink, []},
 	{add_inlink, []},
