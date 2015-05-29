@@ -29,7 +29,8 @@ genome_mutator_test_() ->
 	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:add_sensor_test_/1,
 	  fun ?MODULE:add_actuator_test_/1,
-	  fun ?MODULE:create_link_between_neurons_test_/1,
+	  fun ?MODULE:create_non_recursive_link_between_neurons_test_/1,
+	  fun ?MODULE:create_recursive_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
 	  fun ?MODULE:create_link_between_neuron_and_actuator_test_/1,
 	  fun ?MODULE:cut_link_between_neurons_test_/1,
@@ -354,7 +355,19 @@ add_actuator_test_(_) ->
 %% Creating links
 %% ===================================================================
 
-create_link_between_neurons_test_(_) ->
+create_non_recursive_link_between_neurons_test_(_) ->
+	meck:sequence(random, uniform, 0, [0.6]),
+
+	create_link_between_elements(?B, ?D),
+	
+	NeuronB = find_neuron(?B),
+	NeuronD = find_neuron(?D),
+	
+	[?_assert(lists:member(?D, NeuronB#neuron.output_ids)),
+	?_assert(not(lists:member(?D, NeuronB#neuron.recursive_output_ids))),
+	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights))].
+
+create_recursive_link_between_neurons_test_(_) ->
 	meck:sequence(random, uniform, 0, [0.6]),
 
 	create_link_between_elements(?A, ?B),

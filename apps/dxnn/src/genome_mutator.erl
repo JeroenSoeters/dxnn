@@ -496,10 +496,9 @@ link_from_neuron(FromNeuron, ToId, Generation) ->
 	RecursiveOutputIds = FromNeuron#neuron.recursive_output_ids,
 	case lists:member(ToId, OutputIds) of
 		true ->
-			exit("******** ERROR: link_from_neuron cannot add ~p to output of ~p as it is already connected",
-				[ToId, FromNeuron#neuron.id]);
+			exit("******** ERROR: link_from_neuron cannot add to output as it is already connected");
 		false ->
-			{UpdatedOutputIds, UpdatedRecursiveOutputIds} = case ToLayerIndex >= FromLayerIndex of
+			{UpdatedOutputIds, UpdatedRecursiveOutputIds} = case ToLayerIndex =< FromLayerIndex of
 				true ->
 					{[ToId|OutputIds], [ToId|RecursiveOutputIds]};
 				false ->
