@@ -26,11 +26,11 @@ get_actuators(Morphology)->
 
 xor_mimic(sensors) ->
 	[
-		#sensor{id={sensor, generate_id()}, name=xor_get_input, scape={private, xor_sim}, vl=2}
+		#sensor{name=xor_get_input, scape={private, xor_sim}, vl=2}
 	];
 xor_mimic(actuators) ->
 	[
-		#actuator{id={actuator, generate_id()}, name=xor_send_output, scape={private, xor_sim}, vl=1}
+		#actuator{name=xor_send_output, scape={private, xor_sim}, vl=1}
 	].
 
 test_morph(sensors) ->

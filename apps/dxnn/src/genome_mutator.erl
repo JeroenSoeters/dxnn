@@ -116,7 +116,7 @@ add_bias(AgentId) ->
 			exit("******** ERROR: add_bias cannot add bias to neuron as it is already has a bias");
 		false ->
 			InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
-			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, random:uniform()-0.5}]),
+			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, [random:uniform()-0.5]}]),
 			UpdatedNeuron = Neuron#neuron{
 				input_ids_plus_weights = UpdatedInputIdsPlusWeights,
 				generation = Generation
@@ -581,7 +581,6 @@ cut_link_from_neuron(FromNeuron, ToNeuronId, Generation) ->
 
 cut_link_to_neuron(ToNeuron, FromNeuronId, Generation) ->
 	InputIdsPlusWeights = ToNeuron#neuron.input_ids_plus_weights,
-	io:format("cutting link to neuron. from id: ~p~n idps: ~p~n", [FromNeuronId, InputIdsPlusWeights]),
 	case lists:keymember(FromNeuronId, 1, InputIdsPlusWeights) of
 		true ->
 			UpdatedInputIdsPlusWeights = lists:keydelete(FromNeuronId, 1, InputIdsPlusWeights),
@@ -617,7 +616,7 @@ get_generation(AgentId) ->
 	Agent#agent.generation.
 
 test_x() ->
-	Result = genotype:mutate(test),
+	Result = mutate(test),
 	case Result of
 		{atomic, _} ->
 			io:format("******** Mutation Succesful.~n");
@@ -636,3 +635,15 @@ test_x(AgentId, Mutator) ->
 		end
 	end,
 	mnesia:transaction(F).
+
+long_test(N) when (N > 0) ->
+	genotype:create_test_x(),
+	short_test(N).
+
+short_test(0) ->
+	io:format("~nstarting exoself"),
+	exoself:start(test, void);
+short_test(N) ->
+	test_x(),
+	short_test(N-1).
+

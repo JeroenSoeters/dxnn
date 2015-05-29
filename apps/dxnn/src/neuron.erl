@@ -45,7 +45,7 @@ loop(Id, ExoselfPid, CortexPid, AF, {[{Input_PId, Weights}|InputIdsPlusWeights],
 		{ExoselfPid, terminate} ->
 			ok
 	end;
-loop(Id, ExoselfPid, CortexPid, AF, {[Bias], MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc) ->
+loop(Id, ExoselfPid, CortexPid, AF, {[[Bias]], MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc) ->
 	Output = functions:AF(Acc+Bias),
 	[Output_PId ! {self(), forward, [Output]} || Output_PId <- OutputPids],
 	loop(Id, ExoselfPid, CortexPid, AF, {MInputIdsPlusWeights, MInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, 0);
@@ -81,10 +81,10 @@ perturb_PIdPs(InputIdsPlusWeights) ->
 perturb_PIdPs(MP, [{Input_PId, Weights}|InputIdsPlusWeights], Acc) ->
 	U_Weights = perturb_weights(MP, Weights, []),
 	perturb_PIdPs(MP, InputIdsPlusWeights, [{Input_PId, U_Weights}|Acc]);
-perturb_PIdPs(MP, [Bias], Acc) ->
+perturb_PIdPs(MP, [[Bias]], Acc) ->
 	U_Bias = case random:uniform() < MP of
-		true -> sat((random:uniform()-0.5) * ?DELTA_MULTIPLIER + Bias, -?SAT_LIMIT, ?SAT_LIMIT);
-		false -> Bias
+		true -> [sat((random:uniform()-0.5) * ?DELTA_MULTIPLIER + Bias, -?SAT_LIMIT, ?SAT_LIMIT)];
+		false -> [Bias]
 	end,
 	lists:reverse([U_Bias|Acc]);
 perturb_PIdPs(_MP, [], Acc) ->

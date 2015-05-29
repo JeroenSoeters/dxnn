@@ -105,7 +105,7 @@ add_bias_test_(_) ->
 	Agent = find_agent(?AGENT),
 	[LastMutation|_] = Agent#agent.evo_hist,
 
-	[?_assertEqual({bias, 0.4}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
+	[?_assertEqual({bias, [0.4]}, lists:last(NeuronA#neuron.input_ids_plus_weights)),
 	?_assertEqual({add_bias, ?A}, LastMutation)].
 
 remove_bias_test_(_) ->
