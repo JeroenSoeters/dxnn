@@ -337,14 +337,20 @@ dirty_read(TableAndKey)->
 
 %% doc accepts a record and writes it to the database
 write(Record) ->
-	mnesia:write(Record).
+	F = fun() ->
+		mnesia:write(Record)
+	end,
+	mnesia:transaction(F).
 
 %% doc deletes the key from the given table
 delete(Table, Key) ->
 	mnesia:delete({Table, Key}).
 
 print(AgentId) ->
-	{Agent, Cortex, Sensors, Neurons, Actuators} = read_nn(AgentId),
+	F = fun() ->
+		read_nn(AgentId)
+	end,
+	{atomic, {Agent, Cortex, Sensors, Neurons, Actuators}} = mnesia:transaction(F),
 	io:format("~p~n", [Agent]),
 	io:format("~p~n", [Cortex]),
 	[io:format("~p~n", [Sensor]) || Sensor <- Sensors],

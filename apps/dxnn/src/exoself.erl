@@ -178,10 +178,9 @@ backup_genotype(IdsAndPids, NeuronPids)->
 
 update_genotype(IdsAndPids, [{NeuronId, PidPs}|WeightPs]) ->
 	Neuron = genotype:dirty_read({neuron, NeuronId}),
-	io:format("PidPs:~p~n", [PidPs]),
 	UpdatedInputIdsPlusWeights = convert_PidPs2IdPs(IdsAndPids, PidPs, []),
 	UpdatedNeuron = Neuron#neuron{input_ids_plus_weights=UpdatedInputIdsPlusWeights},
-	UpdatedGenotype = genotype:write(UpdatedNeuron),
+	genotype:write(UpdatedNeuron),
 	update_genotype(IdsAndPids, WeightPs);
 update_genotype(_IdsAndPids, []) ->
 	ok.
