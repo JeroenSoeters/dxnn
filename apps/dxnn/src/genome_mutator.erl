@@ -112,8 +112,7 @@ add_bias(AgentId) ->
 	Neuron = select_random_neuron(Agent),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		true ->
-			exit("******** ERROR: add_bias cannot add bias to neuron ~p as it is already has a bias",
-				[Neuron#neuron.id]);
+			exit("******** ERROR: add_bias cannot add bias to neuron as it is already has a bias");
 		false ->
 			InputIdsPlusWeights = Neuron#neuron.input_ids_plus_weights,
 			UpdatedInputIdsPlusWeights = lists:append(InputIdsPlusWeights, [{bias, random:uniform()-0.5}]),
@@ -134,8 +133,7 @@ remove_bias(AgentId) ->
 	Neuron = select_random_neuron(Agent),
 	case lists:keymember(bias, 1, Neuron#neuron.input_ids_plus_weights) of
 		false ->
-			exit("******** ERROR: add_bias cannot remove bias from neuron ~p as it is doesn't has a bias",
-				[Neuron#neuron.id]);
+			exit("******** ERROR: add_bias cannot remove bias from neuron as it is doesn't has a bias");
 		true ->
 			UpdatedInputIdsPlusWeights = lists:keydelete(bias, 1, Neuron#neuron.input_ids_plus_weights),
 			UpdatedNeuron = Neuron#neuron{
@@ -172,8 +170,7 @@ add_outlink(AgentId) ->
 	OutputIds = Neuron#neuron.output_ids,
 	case (Cortex#cortex.neuron_ids ++ Cortex#cortex.actuator_ids) -- OutputIds of
 		[] ->
-			exit("******** ERROR: add_outlink cannot add outlink to neuron ~p as it is already connected to all other elements",
-				[Neuron#neuron.id]);
+			exit("******** ERROR: add_outlink cannot add outlink to neuron as it is already connected to all other elements");
 		ElementIds ->
 			ToElement = lists:nth(random:uniform(length(ElementIds)), ElementIds),
 			create_link_between_elements(AgentId, Neuron#neuron.id, ToElement),
@@ -191,7 +188,7 @@ add_inlink(AgentId) ->
 	InputIds = [Id || {Id, _Weights} <- Neuron#neuron.input_ids_plus_weights],
 	case (Cortex#cortex.sensor_ids ++ Cortex#cortex.neuron_ids) -- InputIds of 
 		[] ->
-			exit("******** ERROR: add_inlink cannot add inlink to neuron ~p as it is already connected to all other elements", [Neuron#neuron.id]);
+			exit("******** ERROR: add_inlink cannot add inlink to neuron as it is already connected to all other elements");
 		ElementIds ->
 			FromElement = lists:nth(random:uniform(length(ElementIds)), ElementIds),
 			create_link_between_elements(AgentId, FromElement, Neuron#neuron.id),
@@ -210,7 +207,7 @@ add_sensorlink(AgentId) ->
 	FanoutIds = Sensor#sensor.fanout_ids,
 	case Cortex#cortex.neuron_ids -- FanoutIds of
 		[] -> 
-			exit("******** ERROR: add_sensor cannot add inlink to sensor ~p as it is already connected to all neurons", [Sensor#sensor.id]);
+			exit("******** ERROR: add_sensor cannot add outlink to sensor as it is already connected to all neurons");
 		NeuronIds ->
 			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
 			create_link_between_elements(AgentId, SensorId, NeuronId),
@@ -229,7 +226,7 @@ add_actuatorlink(AgentId) ->
 	FaninIds = Actuator#actuator.fanin_ids,
 	case Cortex#cortex.neuron_ids -- FaninIds of
 		[] -> 
-			exit("******** ERROR: add_actuator cannot add inlink to actuator ~p as it is already connected to all neurons", [Actuator#actuator.id]);
+			exit("******** ERROR: add_actuator cannot add inlink to actuator as it is already connected to all neurons");
 		NeuronIds ->
 			NeuronId = lists:nth(random:uniform(length(NeuronIds)), NeuronIds),
 			create_link_between_elements(AgentId, NeuronId, ActuatorId),
@@ -282,8 +279,7 @@ outsplice(TimeProvider) ->
 		AvailableIds = case [{{TargetLayerIndex, TargetUID}, TargetType} || 
 			{{TargetLayerIndex, TargetUID}, TargetType}	<- Neuron#neuron.output_ids, TargetLayerIndex > FromLayerIndex] of
 			[] ->
-				exit("******** ERROR: outsplice cannot outsplice after neuron ~p as there are no feed-forward output connections available",
-					[FromNeuronId]);
+				exit("******** ERROR: outsplice cannot outsplice after neuron as there are no feed-forward output connections available");
 			Ids ->
 				Ids
 		end,
@@ -315,7 +311,7 @@ outsplice(TimeProvider) ->
 	end.
 
 get_new_layer_index(LayerIndex, LayerIndex, _Direction, _Pattern) ->
-	exit("******** ERROR: get_new_layer_index: both neurons have the same layer index: ~p", [LayerIndex]);
+	exit("******** ERROR: get_new_layer_index: both neurons have the same layer index");
 get_new_layer_index(FromLayerIndex, ToLayerIndex, Direction, Pattern) ->
 	NewLayerIndex = case Direction of
 		next -> 
@@ -438,7 +434,6 @@ select_random_neuron(Agent) ->
 
 %% doc based on the node types it dispatches to the correct link function.
 create_link_between_elements(AgentId, FromElement, ToElement) ->
-	io:format("~nlinking ~p to ~p", [FromElement, ToElement]),
 	case {FromElement, ToElement} of
 		{{_FromId, neuron}, {_ToId, neuron}} ->
 			create_link_between_neurons(AgentId, FromElement, ToElement);
@@ -470,7 +465,6 @@ create_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
 	Generation = get_generation(AgentId),
 	Actuator = genotype:read({actuator, ActuatorId}),
 	UpdatedActuator = link_to_actuator(Actuator, NeuronId),
-	io:format("~n updated actuator: ~p~n", [UpdatedActuator]),
 	genotype:write(UpdatedActuator),
 	Neuron = genotype:read({neuron, NeuronId}),
 	UpdatedNeuron = link_from_neuron(Neuron, ActuatorId, Generation),
@@ -480,8 +474,7 @@ link_from_sensor(Sensor, NeuronId) ->
 	FanoutIds = Sensor#sensor.fanout_ids,
 	case lists:member(NeuronId, FanoutIds) of
 		true ->
-			exit("******** ERROR: link_from_sensor cannot add ~p to fanout of ~p as it is already connected",
-				[NeuronId, Sensor#sensor.id]);
+			exit("******** ERROR: link_from_sensor cannot add to fanout as it is already connected");
 		false ->
 			Sensor#sensor{fanout_ids = [NeuronId|FanoutIds]}
 	end.
@@ -490,8 +483,7 @@ link_to_actuator(Actuator, NeuronId) ->
 	FaninIds = Actuator#actuator.fanin_ids,
 	case length(FaninIds) >= Actuator#actuator.vl of
 		true ->
-			exit("******** ERROR: link_to_actuator cannot add ~p to fanin of ~p as it is already connected",
-				[NeuronId, Actuator#actuator.id]);
+			exit("******** ERROR: link_to_actuator cannot add to fanin as it is already connected");
 		false ->
 			Actuator#actuator{fanin_ids = [NeuronId|FaninIds]}
 	end.
@@ -523,8 +515,7 @@ link_to_neuron(FromNeuronId, ToNeuron, VectorLength, Generation) ->
 	InputIdsPlusWeights = ToNeuron#neuron.input_ids_plus_weights,
 	case lists:keymember(FromNeuronId, 1, InputIdsPlusWeights) of
 		true ->
-			exit("******** ERROR: link_to_neuron cannot add ~p to input of ~p as it is already connected",
-				[FromNeuronId, ToNeuron#neuron.id]);
+			exit("******** ERROR: link_to_neuron cannot add to input as it is already connected");
 		false ->
 			UpdatedInputIdsPlusWeights = 
 				[{FromNeuronId, genotype:create_neural_weights(VectorLength)}|InputIdsPlusWeights],
@@ -585,8 +576,7 @@ cut_link_from_neuron(FromNeuron, ToNeuronId, Generation) ->
 			},
 			U;
 		false ->
-			exit("******** ERROR: cut_link_from_neuron cannot remove ~p from output of ~p as it is not connected",
-				[ToNeuronId, FromNeuron#neuron.id])
+			exit("******** ERROR: cut_link_from_neuron cannot remove from output as it is not connected")
 	end.
 
 cut_link_to_neuron(ToNeuron, FromNeuronId, Generation) ->
@@ -600,8 +590,7 @@ cut_link_to_neuron(ToNeuron, FromNeuronId, Generation) ->
 				generation = Generation
 			};
 		false ->
-			exit("******** ERROR: cut_link_to_neuron cannot remove ~p from input of ~p as it is not connected",
-				[FromNeuronId, ToNeuron#neuron.id])
+			exit("******** ERROR: cut_link_to_neuron cannot remove from input as it is not connected")
 	end.
 
 cut_link_from_sensor(Sensor, NeuronId) ->
@@ -610,8 +599,7 @@ cut_link_from_sensor(Sensor, NeuronId) ->
 		true ->
 			Sensor#sensor{fanout_ids = FanoutIds -- [NeuronId]};
 		false ->
-			exit("******** ERROR: cut_link_from_sensor cannot remove ~p from fanout of ~p as it is not connected",
-				[NeuronId, Sensor#sensor.id])
+			exit("******** ERROR: cut_link_from_sensor cannot remove from fanout as it is not connected")
 	end.
 
 cut_link_to_actuator(Actuator, NeuronId) ->
@@ -620,8 +608,7 @@ cut_link_to_actuator(Actuator, NeuronId) ->
 		true ->
 			Actuator#actuator{fanin_ids = FaninIds -- [NeuronId]};
 		false ->
-			exit("******** ERROR: cut_link_to_actuator cannot remove ~p from fanin of ~p as it is not connected",
-				[NeuronId, Actuator#actuator.id])
+			exit("******** ERROR: cut_link_to_actuator cannot remove from fanin as it is not connected")
 	end.
 %% cut_link_from_sensor, cut_link_from_neuron, cut_link_to_neuron, cut_link_to_actuator
 

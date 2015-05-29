@@ -58,7 +58,7 @@ loop(AgentId, PopulationMonitorPid, IdsAndPids, CortexPid, SensorPids, NeuronPid
 					genotype:write(Agent#agent{fitness = UpdatedHighestFitness}),
 					backup_genotype(IdsAndPids, NeuronPids),
 					terminate_phenotype(CortexPid, SensorPids, NeuronPids, ActuatorPids, ScapePids),
-					io:format("Cortex:~p finished training. Genotype has been backed up.~n Fitness:~p~n TotEvaluations:~p~n TotCycles:~p~n TimeAcc:~p~n", [CortexPid, UpdatedHighestFitness, EvalAcc, UpdatedCycleAcc, UpdatedTimeAcc]),
+					io:format("~nCortex:~p finished training. Genotype has been backed up.~n Fitness:~p~n TotEvaluations:~p~n TotCycles:~p~n TimeAcc:~p~n", [CortexPid, UpdatedHighestFitness, EvalAcc, UpdatedCycleAcc, UpdatedTimeAcc]),
 					gen_server:cast(PopulationMonitorPid, {self(), terminated, UpdatedHighestFitness, EvalAcc + 1, UpdatedCycleAcc, UpdatedTimeAcc});
 				false -> %continue training
 					TotNeurons = length(NeuronPids),
@@ -162,7 +162,7 @@ link_cortex(Cortex, IdsAndPids) ->
 backup_genotype(IdsAndPids, NeuronPids)->
 	NeuronIdsNWeights = get_backup(NeuronPids, []),
 	update_genotype(IdsAndPids, NeuronIdsNWeights), 
-	io:format("Finished updating genotype").
+	io:format("~nFinished updating genotype").
 
 	get_backup([NeuronPid|NeuronPids], Acc)->
 		NeuronPid ! {self(), get_backup},
@@ -187,10 +187,13 @@ update_genotype(_IdsAndPids, []) ->
 convert_PidPs2IdPs(IdsAndPids, [{Pid, Weights}|InputPidsPlusWeights], Acc) ->
 	convert_PidPs2IdPs(IdsAndPids, InputPidsPlusWeights, [{ets:lookup_element(IdsAndPids, Pid, 2), Weights}|Acc]);
 convert_PidPs2IdPs(_IdsAndPids, [Bias], Acc) ->
-	lists:reverse([{bias, Bias}|Acc]).
+	lists:reverse([{bias, Bias}|Acc]);
+convert_PidPs2IdPs(_IdsAndPids, [], Acc) ->
+	lists:reverse(Acc).
 %For every {NeuronId,PidPs} tuple the update_genotype/3 function extracts the neuron with the id: NeuronId and updates its weights. The convert_PidPs2IdPs/3 performs the conversion from PidPs to Ids of every {Pid,Weights} tuple in the InputPidsPlusWeights list. The updated Genotype is then returned back to the caller.
 
 terminate_phenotype(CortexPid, SensorPids, NeuronPids, ActuatorPids, ScapePids) ->
+	io:format("~nTerminating the phenotype:~nCx_PId:~p~nSPIds:~p~nNPIds:~p~nAPIds:~p~nScapePids:~p~n", [CortexPid, SensorPids,NeuronPids, ActuatorPids, ScapePids]),
 	[Pid ! {self(), terminate} || Pid <- SensorPids], 
 	[Pid ! {self(), terminate} || Pid <- NeuronPids],
 	[Pid ! {self(), terminate} || Pid <- ActuatorPids],
