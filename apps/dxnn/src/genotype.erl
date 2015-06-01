@@ -220,7 +220,7 @@ clone_agent(AgentId, CloneId, TimeProvider) ->
 		Agent = read({agent, AgentId}),
 		Cortex = read({cortex, Agent#agent.cortex_id}),
 		IdsAndCloneIds = ets:new(idsAndCloneIds, [set, private]),
-		ets:insert(IdsAndCloneIds, {threshold, threshold}),
+		ets:insert(IdsAndCloneIds, {bias, bias}),
 		ets:insert(IdsAndCloneIds, {AgentId, CloneId}),
 		[CloneCortexId] = map_ids(IdsAndCloneIds, [Agent#agent.cortex_id], TimeProvider),
 		CloneSensorIds = map_ids(IdsAndCloneIds, Cortex#cortex.sensor_ids, TimeProvider),
@@ -460,7 +460,7 @@ construct(FileName, Morphology, HiddenLayerDensities, TimeProvider) ->
 		generate_ids(Index-1,TimeProvider,[Id|Acc]).
 
 	generate_id(TimeProvider) ->
-		{MegaSeconds,Seconds,MicroSeconds} = TimeProvider(),
+	{MegaSeconds,Seconds,MicroSeconds} = TimeProvider(),
 		1/(MegaSeconds*1000000 + Seconds + MicroSeconds/1000000).
 %The generate_id()/0 creates a unique id using current time, the Id is a floating point value The generate_ids/2 function creates a list of unique Ids.
 
