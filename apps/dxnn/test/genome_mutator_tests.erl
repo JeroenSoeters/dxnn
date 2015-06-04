@@ -20,6 +20,7 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_bias_test_/1,
 	  fun ?MODULE:remove_bias_test_/1,
 	  fun ?MODULE:mutate_af_test_/1,
+	  fun ?MODULE:mutate_af_error_test_/1,
 	  fun ?MODULE:add_outlink_to_neuron_test_/1,
 	  fun ?MODULE:add_outlink_to_actuator_test_/1,
 	  fun ?MODULE:add_inlink_from_neuron_test_/1,
@@ -134,6 +135,16 @@ mutate_af_test_(_) ->
 
 	[?_assertEqual(cos, NeuronB#neuron.af),	
 	?_assertEqual({mutate_af, ?B}, LastMutation)].
+
+mutate_af_error_test_(_) ->
+	Agent = find_agent(?AGENT),
+	genotype:write(Agent#agent{
+		constraint = #constraint{morphology = test_morph, neural_afs = [gauss]}
+	}),
+
+	meck:sequence(random, uniform, 1, [1]),
+
+	?_assertError({badmatch, _}, in_transaction(fun() -> genome_mutator:mutate_af(?AGENT) end)).
 
 add_outlink_to_neuron_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is

@@ -152,16 +152,20 @@ mutate_af(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
 	Generation = Agent#agent.generation,
 	Neuron = select_random_neuron(Agent),
-	ActivationFunctions = (Agent#agent.constraint)#constraint.neural_afs -- [Neuron#neuron.af],
-	UpdatedNeuron = Neuron#neuron{
-		af = genotype:generate_activation_function(ActivationFunctions),
-		generation = Generation
-	},
-	UpdatedAgent = Agent#agent{
-		evo_hist = [{mutate_af, Neuron#neuron.id}|Agent#agent.evo_hist]
-	},
-	genotype:write(UpdatedNeuron),
-	genotype:write(UpdatedAgent).
+	case (Agent#agent.constraint)#constraint.neural_afs -- [Neuron#neuron.af] of
+		[] ->
+			exit("******** ERROR: mutate_af cannot mutate activation function as there are no other activation functions available");
+		ActivationFunctions ->
+			UpdatedNeuron = Neuron#neuron{
+				af = genotype:generate_activation_function(ActivationFunctions),
+				generation = Generation
+			},
+			UpdatedAgent = Agent#agent{
+				evo_hist = [{mutate_af, Neuron#neuron.id}|Agent#agent.evo_hist]
+			},
+			genotype:write(UpdatedNeuron),
+			genotype:write(UpdatedAgent)
+	end.
 
 add_outlink(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
