@@ -172,7 +172,7 @@ last_agent_terminated_then_continue_end_condition_not_reached_test_(_) ->
 	exit(GeneratorPid, normal),
 	
 	[?_assertEqual(
-		ordsets:from_list([{?AGENT2, 16}, {?AGENT4, 13}, {?AGENT7, 9}, {?AGENT9, 14}, {?AGENT10, 15}, {?AGENT11, 10}, {?AGENT12, 11}, {?AGENT13, 12}]),
+		ordsets:from_list([{?AGENT2, 13}, {?AGENT4, 14}, {?AGENT7, 9}, {?AGENT9, 15}, {?AGENT10, 16}, {?AGENT11, 10}, {?AGENT12, 11}, {?AGENT13, 12}]),
 		ordsets:from_list(State#state.active_agent_ids_and_pids)),
 	 ?_assertEqual(8, State#state.total_agents),
 	 ?_assertEqual(8, State#state.agents_left),
@@ -380,7 +380,7 @@ mutate_population_test_(_) ->
 	 ?_assertEqual(
 		sets:from_list([?AGENT7, ?AGENT11, ?AGENT12, ?AGENT13]), 
 		sets:from_list(Species2#species.agent_ids)),
-	 ?_assertEqual([?AGENT2, ?AGENT4], Species1#species.champion_ids),
+	 ?_assertEqual([?AGENT4, ?AGENT2], Species1#species.champion_ids),
 	 ?_assertEqual([?AGENT7, ?AGENT6], Species2#species.champion_ids),
 	 ?_assertEqual({14.75, 10.256095748383007, 4, 25}, Species1#species.fitness),
 	 ?_assertEqual({134.75, 211.13428783596473, 4, 500}, Species2#species.fitness),

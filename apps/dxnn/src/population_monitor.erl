@@ -3,7 +3,7 @@
 % API
 -export([start_link/1, start_link/0, start/1, start/0, stop/0, init/2]).
 % gen server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/2, extract_agent_ids/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/2, extract_agent_ids/2, test/0]).
 %-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, create_mutant_agent_copy/1, test/0, create_species/3, continue/2, continue/3, init_population/1, extract_agent_ids/2, delete_population/1]).
 -behaviour(gen_server).
 -ifdef(TEST).
@@ -13,7 +13,7 @@
 
 % Population monitor options and parameters
 -define(SELECTION_ALGORITHM, competition).
--define(EFF, 0.05).
+-define(EFF, 0.2).
 -define(INIT_CONSTRAINTS,
 	[#constraint{morphology=Morphology, neural_afs=NeuralAfs} || Morphology <- [xor_mimic], NeuralAfs <- [[tanh]]]).
 -define(SURVIVAL_PERCENTAGE, 0.5).
@@ -27,7 +27,7 @@
 -define(DIVERSITY_COUNT_STEP, 500).
 -define(GEN_UID, genotype:generate_unique_id()).
 -define(CHAMPION_COUNT_STEP, 500).
--define(FITNESS_GOAL, inf).
+-define(FITNESS_GOAL, 1000).
 -record(state, {op_mode, population_id, active_agent_ids_and_pids=[], agent_ids=[], total_agents, agents_left, op_tag, agent_summaries=[], pop_gen=0, eval_acc=0, cycle_acc=0, time_acc=0, step_size, next_step, goal_status, selection_algorithm, population_limit, time_provider}).
 start_link(StartParameters) ->
 	gen_server:start_link(?MODULE, StartParameters, []).
@@ -54,7 +54,7 @@ init(Pid, InitState) ->
 
 init(Parameters) ->
 	%rocess_flag(trap_exit, true),
-	%register(monitor, self()),
+	register(monitor, self()),
 	io:format("******** Population monitor started with parameters:~p~n", [Parameters]),
 	{OpMode, PopulationId, SelectionAlgorithm} = Parameters,
 	AgentIds = extract_agent_ids(PopulationId, all),
@@ -66,7 +66,9 @@ init(Parameters) ->
 		total_agents = length(AgentIds),
 		agents_left = length(AgentIds),
 		op_tag = continue,
-		selection_algorithm = SelectionAlgorithm
+		selection_algorithm = SelectionAlgorithm,
+		population_limit = ?SPECIES_SIZE_LIMIT,
+		time_provider = fun now/0
 	},
 	{ok, State}.
 
@@ -272,7 +274,7 @@ delete_specie(SpeciesId)->
 	mnesia:delete({species, SpeciesId}).
 
 mutate_population(PopulationId, PopulationLimit, SelectionAlgorithm, TimeProvider) ->
-	NeuralEnergyCost = population_monitor:calculate_neural_energy_cost(PopulationId),
+	NeuralEnergyCost = calculate_neural_energy_cost(PopulationId),
 	F = fun() ->
 		Population = genotype:read({population, PopulationId}),
 		SpeciesIds = Population#population.species_ids,
@@ -288,8 +290,8 @@ mutate_species(SpeciesId, PopulationLimit, NeuralEnergyCost, SelectionAlgorithm,
 	case SelectionAlgorithm of
 		competition ->
 			TotalSurvivors = round(length(SortedAgentSummaries) * ?SURVIVAL_PERCENTAGE),
-			SDX = [{Fitness/math:pow(TotalNeurons, ?EFF), {Fitness, TotalNeurons, AgentId}} ||
-				{Fitness, TotalNeurons, AgentId} <- SortedAgentSummaries],
+			SDX = lists:reverse(lists:sort([{Fitness/math:pow(TotalNeurons, ?EFF), {Fitness, TotalNeurons, AgentId}} ||
+				{Fitness, TotalNeurons, AgentId} <- SortedAgentSummaries])),
 			ProperlySortedAgentSummaries = [Summary || {_, Summary} <- SDX],
 			ValidAgentSummaries = lists:sublist(ProperlySortedAgentSummaries, TotalSurvivors),
 			InvalidAgentSummaries = ProperlySortedAgentSummaries -- ValidAgentSummaries,
