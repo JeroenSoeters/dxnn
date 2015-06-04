@@ -60,7 +60,7 @@ population_monitor_test_() ->
 %% ===================================================================
 
 setup() ->
-	mnesia:delete_schema({node()}),
+	R = mnesia:delete_schema({node()}),
 	ok = polis:create(),
 	in_transaction(fun() ->	[mnesia:write(R) || R <- create_test_population()] end),
 	case whereis(exoself_meck) of
