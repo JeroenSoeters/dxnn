@@ -30,7 +30,7 @@ loop(Id, ExoselfPid, CortexPid, AF, {[{Input_PId, Weights}|InputIdsPlusWeights],
 			loop(Id, ExoselfPid, CortexPid, AF, {RInputIdsPlusWeights, RInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc);
 		{ExoselfPid, weight_perturb} ->
 			PInputIdsPlusWeights = perturb_PIdPs(MInputIdsPlusWeights),
-			loop(Id, ExoselfPid, CortexPid, AF, {PInputIdsPlusWeights, PInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc);
+			loop(Id, ExoselfPid, CortexPid, AF, {[{Input_PId, Weights}|InputIdsPlusWeights], PInputIdsPlusWeights}, OutputPids, RecursiveOutputPids, Acc);
 		{ExoselfPid, reset_prep} ->
 			neuron:flush_buffer(),
 			ExoselfPid ! {self(), ready},
