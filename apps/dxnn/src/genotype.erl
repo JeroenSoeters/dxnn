@@ -142,9 +142,9 @@ calculate_recursive_output_ids(_SelfId, [], Acc) ->
 update_fingerprint(AgentId) ->
 	Agent = read({agent, AgentId}),
 	Cortex = read({cortex, Agent#agent.cortex_id}),
-	GeneralizedSensors = [(read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined} 
+	GeneralizedSensors = [(read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[]} 
 		|| SensorId <- Cortex#cortex.sensor_ids],
-	GeneralizedActuators = [(read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined} 
+	GeneralizedActuators = [(read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined, fanin_ids=[]} 
 		|| ActuatorId <- Cortex#cortex.actuator_ids],
 	GeneralizedPattern = [{LayerIndex, length(LayerNeuronIds)} 
 		|| {LayerIndex, LayerNeuronIds} <- Agent#agent.pattern],
