@@ -44,7 +44,7 @@ genome_mutator_test_() ->
 
 setup() ->
 	mnesia:delete_schema({node()}),
-	polis:start(),
+	ok = polis:create(),
 	in_transaction(fun() ->	[mnesia:write(R) || R <- create_test_genotype()] end),
 	case whereis(random_meck) of
 		undefined ->
