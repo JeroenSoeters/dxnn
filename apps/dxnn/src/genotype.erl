@@ -340,7 +340,7 @@ write(Record) ->
 	F = fun() ->
 		mnesia:write(Record)
 	end,
-	mnesia:transaction(F).
+	{atomic, _} = mnesia:transaction(F).
 
 %% doc deletes the key from the given table
 delete(Table, Key) ->
