@@ -26,7 +26,8 @@ mutate(AgentId) ->
 		Agent = genotype:read({agent, AgentId}),
 		NextGeneration = Agent#agent.generation + 1,
 		genotype:write(Agent#agent{generation = NextGeneration}),
-		apply_mutation_operators(AgentId)
+		apply_mutation_operators(AgentId),
+		genotype:update_fingerprint(AgentId)
 	end,
 	mnesia:transaction(F).
 
@@ -636,7 +637,8 @@ test_x(AgentId, Mutator) ->
 				genome_mutator:M(AgentId);
 			_ ->
 				(apply(genome_mutator, M, Args))(AgentId)
-		end
+		end,
+		genotype:update_fingerprint(AgentId)
 	end,
 	mnesia:transaction(F).
 
