@@ -43,8 +43,8 @@ setup() ->
 	meck:sequence(random, seed, 1, [0]),
 	% The first number returned is the probability of connecting the sensor to a single neuron, because this is < 0 the sensor will be connected to all neurons. The second and third are for the random weights.
 	meck:sequence(random, uniform, 0, [0, 0.9, 1.0]),
-	% This is the call for the activation function, which will result in the cos function being selected.
-	meck:sequence(random, uniform, 1, [2]),
+	% This is the call for the activation function, which will result in the cos function being selected. The second result is the index of the neuron of which the af is going to be mutated, the third is the af selector (gauss).
+	meck:sequence(random, uniform, 1, [2, 1, 2]),
 	
 	% These numbers will result in the Id's 1, 2, 4 and 8 for respectively the cortex_id, sensor_id, actuator_id and neuron_id
 	Pid = test_helpers:create_sequence_generator([{0, 1, 0}, {0, 0.5, 0}, {0, 0.25, 0}, {0, 0.125, 0}, {0, 2, 0}, {0, 0.2, 0}, {0, 0.0625, 0}, {0, 0.05, 0}]),
@@ -52,6 +52,8 @@ setup() ->
 
 	test_helpers:in_transaction(fun() -> 
 		genotype:construct_agent(?SPECIES_ID, ?AGENT, #constraint{}, FakeTimeProvider),
+		% we apply one mutate_af mutation to generate an evolution history
+		genome_mutator:test_x(?AGENT, mutate_af),
 		genotype:clone_agent(?AGENT, ?CLONE, FakeTimeProvider)
 	end).
 
@@ -60,13 +62,12 @@ teardown(_) ->
 
 construct_agent_test_(_) ->
 	Agent = test_helpers:find_agent(?AGENT),
-	
 	[?_assertNot(Agent == undefined),
 	 ?_assertEqual(?CORTEX, Agent#agent.cortex_id),
 	 ?_assertEqual(?SPECIES_ID, Agent#agent.species_id),
 	 ?_assertEqual(0, Agent#agent.generation),
 	 ?_assertEqual(#constraint{}, Agent#agent.constraint),
-	 ?_assertEqual([], Agent#agent.evo_hist),
+	 ?_assertEqual([{mutate_af, ?NEURON}], Agent#agent.evo_hist),
 	 ?_assertEqual([{0, [?NEURON]}], Agent#agent.pattern)].
 
 construct_cortex_test_(_) ->
@@ -98,7 +99,7 @@ construct_neuron_test_(_) ->
 	[?_assertNot(Neuron == undefined),
 	 ?_assertEqual(?CORTEX, Neuron#neuron.cortex_id), 
 	 ?_assertEqual(0, Neuron#neuron.generation),
-	 ?_assertEqual(cos, Neuron#neuron.af),
+	 ?_assertEqual(gaussian, Neuron#neuron.af),
 	 ?_assertEqual([{?SENSOR, [0.4, 0.5]}], Neuron#neuron.input_ids_plus_weights),
 	 ?_assertEqual([?ACTUATOR], Neuron#neuron.output_ids),
 	 ?_assertEqual([], Neuron#neuron.recursive_output_ids)].
@@ -140,7 +141,7 @@ clone_neuron_test_(_) ->
 	[?_assertNot(ClonedNeuron == undefined),
 	 ?_assertEqual(?CLONED_CORTEX, ClonedNeuron#neuron.cortex_id), 
 	 ?_assertEqual(0, ClonedNeuron#neuron.generation),
-	 ?_assertEqual(cos, ClonedNeuron#neuron.af),
+	 ?_assertEqual(gaussian, ClonedNeuron#neuron.af),
 	 ?_assertEqual([{?CLONED_SENSOR, [0.4, 0.5]}], ClonedNeuron#neuron.input_ids_plus_weights),
 	 ?_assertEqual([?CLONED_ACTUATOR], ClonedNeuron#neuron.output_ids),
 	 ?_assertEqual([], ClonedNeuron#neuron.recursive_output_ids)].
