@@ -28,8 +28,8 @@ construct_cortex(AgentId, Generation, SpeciesConstraint, TimeProvider) ->
 		cortex_id=CortexId, generation=Generation} || Sensor <- morphology:get_init_sensors(Morphology)],
 	Actuators = [Actuator#actuator{id={{1, generate_unique_id(TimeProvider)}, actuator}, 
 		cortex_id=CortexId, generation=Generation} || Actuator <- morphology:get_init_actuators(Morphology)],
-	NeuronIds = construct_initial_neuro_layer(CortexId, Generation, 
-		SpeciesConstraint, Sensors, Actuators, TimeProvider),
+	NeuronIds = construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, 
+		Actuators, TimeProvider),
 	SensorIds = [Sensor#sensor.id || Sensor <- Sensors],
 	ActuatorIds = [Actuator#actuator.id || Actuator <- Actuators],
 	Cortex = #cortex{
@@ -45,7 +45,7 @@ construct_cortex(AgentId, Generation, SpeciesConstraint, TimeProvider) ->
 %% doc Creates a set of neurons for each actuator in the actuator list. The neurons are initialized in construct_initial_neurons/6 where they are connected to the actuator, and from a random subset of the sensors passed tp the function. construct_initial_neurons/6 returns the updated sensors. The actuator's fanin_ids is then updated to include the neuron ids that where connected to it. Once all the actuators have been connected, the sensors and actuators are written to the database and the set of newly created neuron ids is returned to the caller.
 construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, TimeProvider) ->
 	construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, Actuators, TimeProvider, [], []).
-construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint,Sensors, 
+construct_initial_neuro_layer(CortexId, Generation, SpeciesConstraint, Sensors, 
 	[Actuator|Actuators], TimeProvider, ActuatorsAcc, NeuronIdsAcc) ->
 		NeuronIds = [{{0, Id}, neuron} || Id <- generate_unique_ids(Actuator#actuator.vl, TimeProvider)],
 		UpdatedSensors = construct_initial_neurons(CortexId, Generation, SpeciesConstraint, NeuronIds, 
