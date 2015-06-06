@@ -108,7 +108,8 @@ clone_agent_test_(_) ->
 	ClonedAgent = test_helpers:find_agent(?CLONE),
 	
 	[?_assertNot(ClonedAgent == undefined),
-	 ?_assertEqual(?CLONED_CORTEX, ClonedAgent#agent.cortex_id)].
+	 ?_assertEqual(?CLONED_CORTEX, ClonedAgent#agent.cortex_id),
+	 ?_assertEqual([{mutate_af, ?CLONED_NEURON}], ClonedAgent#agent.evo_hist)].
 
 clone_cortex_test_(_) ->
 	ClonedCortex = test_helpers:find_cortex(?CLONED_CORTEX),
