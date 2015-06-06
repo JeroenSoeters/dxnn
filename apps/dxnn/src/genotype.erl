@@ -278,7 +278,6 @@ map_evolution_history(IdsAndCloneIds, [{MutationOperator, Element1}|Hist], Acc) 
 map_evolution_history(_IdsAndCloneIds, [], Acc) ->
 	lists:reverse(Acc).
 
-
 %% doc accepts as the input the name of the ets table and the list of sensor ids. It then goes throught all the ids, reads the sensor from the database and updates all its ids from their original values to their clone values stored in the ets table. Afterwards the new version of the sensor is written to the database, effectively cloning the original sernsor.
 clone_sensors(IdsAndCloneIds, [SensorId|SensorIds]) ->
 	Sensor = read({sensor, SensorId}),
