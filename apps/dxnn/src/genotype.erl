@@ -229,6 +229,7 @@ clone_agent(AgentId, CloneId, TimeProvider) ->
 		clone_neurons(IdsAndCloneIds, Cortex#cortex.neuron_ids),
 		clone_sensors(IdsAndCloneIds, Cortex#cortex.sensor_ids),
 		clone_actuators(IdsAndCloneIds, Cortex#cortex.actuator_ids),
+		UpdatedEvolutionHistory = map_evolution_history(IdsAndCloneIds, Agent#agent.evo_hist),
 
 		write(Cortex#cortex{
 			id = CloneCortexId,
@@ -239,7 +240,8 @@ clone_agent(AgentId, CloneId, TimeProvider) ->
 		}),
 		write(Agent#agent{
 			id = CloneId,
-			cortex_id = CloneCortexId
+			cortex_id = CloneCortexId,
+			evo_hist = UpdatedEvolutionHistory
 		}),
 		ets:delete(IdsAndCloneIds)
 	end,
@@ -258,6 +260,24 @@ map_ids(IdsAndCloneIds, [Id|Ids], TimeProvider, Acc) ->
 	map_ids(IdsAndCloneIds, Ids, TimeProvider, [CloneId|Acc]);
 map_ids(_IdsAndCloneIds, [], _TimeProvider, Acc) ->
 	lists:reverse(Acc).
+
+map_evolution_history(IdsAndCloneIds, EvolutionHistory) ->
+	map_evolution_history(IdsAndCloneIds, EvolutionHistory, []).
+map_evolution_history(IdsAndCloneIds, [{MutationOperator, Element1, Element2, Element3}|Hist], Acc) ->
+	ClonedElement1 = ets:lookup_element(IdsAndCloneIds, Element1, 2),
+	ClonedElement2 = ets:lookup_element(IdsAndCloneIds, Element2, 2),
+	ClonedElement3 = ets:lookup_element(IdsAndCloneIds, Element3, 2),
+	map_evolution_history(IdsAndCloneIds, Hist, [{MutationOperator, ClonedElement1, ClonedElement2, ClonedElement3}|Acc]);
+map_evolution_history(IdsAndCloneIds, [{MutationOperator, Element1, Element2}|Hist], Acc) ->
+	ClonedElement1 = ets:lookup_element(IdsAndCloneIds, Element1, 2),
+	ClonedElement2 = ets:lookup_element(IdsAndCloneIds, Element2, 2),
+	map_evolution_history(IdsAndCloneIds, Hist, [{MutationOperator, ClonedElement1, ClonedElement2}|Acc]);
+map_evolution_history(IdsAndCloneIds, [{MutationOperator, Element1}|Hist], Acc) ->
+	ClonedElement1 = ets:lookup_element(IdsAndCloneIds, Element1, 2),
+	map_evolution_history(IdsAndCloneIds, Hist, [{MutationOperator, ClonedElement1}|Acc]);
+map_evolution_history(_IdsAndCloneIds, [], Acc) ->
+	lists:reverse(Acc).
+
 
 %% doc accepts as the input the name of the ets table and the list of sensor ids. It then goes throught all the ids, reads the sensor from the database and updates all its ids from their original values to their clone values stored in the ets table. Afterwards the new version of the sensor is written to the database, effectively cloning the original sernsor.
 clone_sensors(IdsAndCloneIds, [SensorId|SensorIds]) ->
