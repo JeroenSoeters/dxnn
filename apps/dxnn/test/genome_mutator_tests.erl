@@ -355,7 +355,7 @@ add_sensor_error_test_(_) ->
 	[?_assertError({badmatch, _}, in_transaction(fun() -> (genome_mutator:add_sensor(FakeTimeProvider))(?AGENT) end))].
 
 add_actuator_test_(_) ->
-	NewActuatorId = {{-1, 80.0}, actuator},
+	NewActuatorId = {{1, 80.0}, actuator},
 	
 	% The first call to random:uniform/1 will be to select an actuator from the morphology,
 	% since there is only one unused actuator we return that one. The second call will be to

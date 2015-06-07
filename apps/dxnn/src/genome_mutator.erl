@@ -407,7 +407,7 @@ add_actuator(TimeProvider) ->
 			[] ->
 				exit("******** ERROR: add_actuator cannot add actuator as the NN is already using all available actuators");
 			AvailableActuators ->
-				NewActuatorId = {{-1, genotype:generate_unique_id(TimeProvider)}, actuator},
+				NewActuatorId = {{1, genotype:generate_unique_id(TimeProvider)}, actuator},
 				NewActuator = (lists:nth(random:uniform(length(AvailableActuators)), AvailableActuators))#actuator{
 					id = NewActuatorId,
 					cortex_id = CortexId
