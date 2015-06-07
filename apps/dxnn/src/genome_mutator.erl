@@ -368,7 +368,7 @@ add_sensor(TimeProvider) ->
 		SpeciesConstraint = Agent#agent.constraint,
 		Morphology = SpeciesConstraint#constraint.morphology,
 		case morphology:get_sensors(Morphology) --
-			[(genotype:read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[]} 
+			[(genotype:read({sensor, SensorId}))#sensor{id=undefined, cortex_id=undefined, fanout_ids=[], generation=undefined} 
 				|| SensorId <- SensorIds] of
 			[] ->
 				exit("******** ERROR: add_sensor cannot add sensor as the NN is already using all available sensors");
@@ -402,7 +402,7 @@ add_actuator(TimeProvider) ->
 		SpeciesConstraint = Agent#agent.constraint,
 		Morphology = SpeciesConstraint#constraint.morphology,
 		case morphology:get_actuators(Morphology) --
-			[(genotype:read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined, fanin_ids=[]} 
+			[(genotype:read({actuator, ActuatorId}))#actuator{id=undefined, cortex_id=undefined, fanin_ids=[], generation=undefined} 
 				|| ActuatorId <- ActuatorIds] of
 			[] ->
 				exit("******** ERROR: add_actuator cannot add actuator as the NN is already using all available actuators");
@@ -461,7 +461,7 @@ create_link_between_neurons(AgentId, FromId, ToId) ->
 create_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
 	Generation = get_generation(AgentId),
 	Sensor = genotype:read({sensor, SensorId}),
-	UpdatedSensor = link_from_sensor(Sensor, NeuronId),
+	UpdatedSensor = link_from_sensor(Sensor, NeuronId, Generation),
 	genotype:write(UpdatedSensor),
 	Neuron = genotype:read({neuron, NeuronId}),
 	UpdatedNeuron = link_to_neuron(SensorId, Neuron, Sensor#sensor.vl, Generation),
@@ -470,28 +470,34 @@ create_link_between_sensor_and_neuron(AgentId, SensorId, NeuronId) ->
 create_link_between_neuron_and_actuator(AgentId, NeuronId, ActuatorId) ->
 	Generation = get_generation(AgentId),
 	Actuator = genotype:read({actuator, ActuatorId}),
-	UpdatedActuator = link_to_actuator(Actuator, NeuronId),
+	UpdatedActuator = link_to_actuator(Actuator, NeuronId, Generation),
 	genotype:write(UpdatedActuator),
 	Neuron = genotype:read({neuron, NeuronId}),
 	UpdatedNeuron = link_from_neuron(Neuron, ActuatorId, Generation),
 	genotype:write(UpdatedNeuron).
 
-link_from_sensor(Sensor, NeuronId) ->
+link_from_sensor(Sensor, NeuronId, Generation) ->
 	FanoutIds = Sensor#sensor.fanout_ids,
 	case lists:member(NeuronId, FanoutIds) of
 		true ->
 			exit("******** ERROR: link_from_sensor cannot add to fanout as it is already connected");
 		false ->
-			Sensor#sensor{fanout_ids = [NeuronId|FanoutIds]}
+			Sensor#sensor{
+				fanout_ids = [NeuronId|FanoutIds],
+				generation = Generation
+			}
 	end.
 
-link_to_actuator(Actuator, NeuronId) ->
+link_to_actuator(Actuator, NeuronId, Generation) ->
 	FaninIds = Actuator#actuator.fanin_ids,
 	case length(FaninIds) >= Actuator#actuator.vl of
 		true ->
 			exit("******** ERROR: link_to_actuator cannot add to fanin as it is already connected");
 		false ->
-			Actuator#actuator{fanin_ids = [NeuronId|FaninIds]}
+			Actuator#actuator{
+				fanin_ids = [NeuronId|FaninIds],
+				generation = Generation
+			}
 	end.
 
 link_from_neuron(FromNeuron, ToId, Generation) ->

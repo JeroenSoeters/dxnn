@@ -29,7 +29,9 @@ genome_mutator_test_() ->
 	  fun ?MODULE:add_neuron_test_/1,
 	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:add_sensor_test_/1,
+	  fun ?MODULE:add_sensor_error_test_/1,
 	  fun ?MODULE:add_actuator_test_/1,
+	  fun ?MODULE:add_actuator_error_test_/1,
 	  fun ?MODULE:create_non_recursive_link_between_neurons_test_/1,
 	  fun ?MODULE:create_recursive_link_between_neurons_test_/1,
 	  fun ?MODULE:create_link_between_sensor_and_neuron_test_/1,
@@ -71,7 +73,7 @@ mutate_test_(_) ->
 
 	Agent = find_agent(?AGENT),
 	
-	[?_assertEqual(1, Agent#agent.generation),
+	[?_assertEqual(3, Agent#agent.generation),
 	 ?_assertEqual(2, length(Agent#agent.evo_hist))].
 
 %% ===================================================================
@@ -336,6 +338,22 @@ add_sensor_test_(_) ->
 	 ?_assert(lists:member(NewSensorId, Cortex#cortex.sensor_ids)),
 	 ?_assertEqual({add_sensor, NewSensorId, ?C}, LastMutation)].
 
+add_sensor_error_test_(_) ->
+	NewSensorId = {{-1, 80.0}, sensor},
+	
+	% The first call to random:uniform/1 will be to select a sensor from the morphology,
+	% since there is only one unused sensor we return that one. The second call will be to
+	% select a neuron from the list, we will connect neuron c, which is under index 3.  
+	meck:sequence(random, uniform, 1, [1, 3, 1, 4]),
+	
+	meck:sequence(random, uniform, 0, [0.6, 0.6]),
+
+	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
+
+	{atomic, _} = in_transaction(fun() -> (genome_mutator:add_sensor(FakeTimeProvider))(?AGENT) end),
+
+	[?_assertError({badmatch, _}, in_transaction(fun() -> (genome_mutator:add_sensor(FakeTimeProvider))(?AGENT) end))].
+
 add_actuator_test_(_) ->
 	NewActuatorId = {{-1, 80.0}, actuator},
 	
@@ -361,6 +379,24 @@ add_actuator_test_(_) ->
 	 ?_assert(lists:member(NewActuatorId, NeuronC#neuron.output_ids)),
 	 ?_assert(lists:member(NewActuatorId, Cortex#cortex.actuator_ids)),
 	 ?_assertEqual({add_actuator, NewActuatorId, ?C}, LastMutation)].
+
+add_actuator_error_test_(_) ->
+	% First we add the other actuator to make sure all	
+	NewActuatorId = {{-1, 80.0}, actuator},
+	
+	% The first call to random:uniform/1 will be to select an actuator from the morphology,
+	% since there is only one unused actuator we return that one. The second call will be to
+	% select a neuron from the list, we will connect neuron c, which is under index 3.  
+	meck:sequence(random, uniform, 1, [1, 3]),
+	
+	meck:sequence(random, uniform, 0, [0.6, 0.6]),
+
+	FakeTimeProvider = fun() -> {0, 0.0125, 0} end,
+
+	{atomic, _} = in_transaction(fun() -> (genome_mutator:add_actuator(FakeTimeProvider))(?AGENT) end),
+
+	[?_assertError({badmatch, _}, in_transaction(fun() -> (genome_mutator:add_actuator(FakeTimeProvider))(?AGENT) end))].
+
 
 %% ===================================================================
 %% Creating links
@@ -399,7 +435,8 @@ create_link_between_sensor_and_neuron_test_(_) ->
 	NeuronC = find_neuron(?C),
 
 	[?_assert(lists:member(?C, Sensor#sensor.fanout_ids)),
-	?_assert(lists:keymember(?SENSOR, 1, NeuronC#neuron.input_ids_plus_weights))].
+	 ?_assertEqual(2, Sensor#sensor.generation),	
+	 ?_assert(lists:keymember(?SENSOR, 1, NeuronC#neuron.input_ids_plus_weights))].
 
 create_link_between_neuron_and_actuator_test_(_) ->
 	meck:sequence(random, uniform, 0, [0.6]),
@@ -410,7 +447,8 @@ create_link_between_neuron_and_actuator_test_(_) ->
 	Actuator = find_actuator(?ACTUATOR),
 
 	[?_assert(lists:member(?ACTUATOR, NeuronB#neuron.output_ids)),
-	?_assert(lists:member(?B, Actuator#actuator.fanin_ids))].
+	 ?_assert(lists:member(?B, Actuator#actuator.fanin_ids)),
+	 ?_assertEqual(2, Actuator#actuator.generation)].
 
 %% ===================================================================
 %% Cutting links
@@ -481,7 +519,7 @@ in_transaction(Action) ->
 %%      B 
 create_test_genotype() ->
 	[#agent{id = ?AGENT,
-			 generation = 0,
+			 generation = 2,
 			 population_id = undefined,	
 			 species_id = test,
 			 cortex_id = {{origin,10},cortex},
@@ -509,6 +547,7 @@ create_test_genotype() ->
 	    actuator_ids = [?ACTUATOR]},
 	#sensor{
 		id = ?SENSOR,
+		generation = 1,
 		cortex_id = {{origin,10},cortex},
 		name = sensor1,
 		scape = {private,test_sim},
@@ -554,6 +593,7 @@ create_test_genotype() ->
 		recursive_output_ids = []},
 	 #actuator{
 		id = ?ACTUATOR,
+		generation = 1,
 		cortex_id = {{origin,10},cortex},
 		name = actuator1,
 		scape = {private,test_sim},
