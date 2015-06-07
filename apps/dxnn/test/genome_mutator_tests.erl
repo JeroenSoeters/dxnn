@@ -22,11 +22,15 @@ genome_mutator_test_() ->
 	  fun ?MODULE:mutate_af_test_/1,
 	  fun ?MODULE:mutate_af_error_test_/1,
 	  fun ?MODULE:add_outlink_to_neuron_test_/1,
+      fun ?MODULE:add_outlink_to_neuron_feedforward_error_test_/1,
 	  fun ?MODULE:add_outlink_to_actuator_test_/1,
 	  fun ?MODULE:add_inlink_from_neuron_test_/1,
+	  fun ?MODULE:add_inlink_from_neuron_feedforward_error_test_/1,
 	  fun ?MODULE:add_sensorlink_test_/1,
 	  fun ?MODULE:add_actuatorlink_test_/1,
 	  fun ?MODULE:add_neuron_test_/1,
+	  fun ?MODULE:add_neuron_no_outlink_available_error_test_/1,
+	  fun ?MODULE:add_neuron_no_inlink_available_error_test_/1,
 	  fun ?MODULE:outsplice_test_/1,
 	  fun ?MODULE:add_sensor_test_/1,
 	  fun ?MODULE:add_sensor_error_test_/1,
@@ -165,6 +169,14 @@ add_outlink_to_neuron_test_(_) ->
 	?_assert(lists:keymember(?B, 1, NeuronD#neuron.input_ids_plus_weights)),
 	?_assertEqual({add_outlink, ?B, ?D}, LastMutation)].
 
+add_outlink_to_neuron_feedforward_error_test_(_) ->
+	change_connection_architecture(feedforward),
+
+	% We will try to connect from neuron d. It should fail as there ar no available neurons.
+	meck:sequence(random, uniform, 1, [4]),
+
+	?_assertError({badmatch, _}, in_transaction(fun() -> genome_mutator:add_outlink(?AGENT) end)).
+
 add_outlink_to_actuator_test_(_) ->
 	% We will connect neuron b to neuron d. The first call to random:uniform/1 returns 2 because b is
 	% the second element, actuator is then the 4rd as c is removed from the list as it's already connected.
@@ -197,6 +209,14 @@ add_inlink_from_neuron_test_(_) ->
 	[?_assert(lists:member(?A, NeuronD#neuron.output_ids)),
 	 ?_assert(lists:keymember(?D, 1, NeuronA#neuron.input_ids_plus_weights)),
 	 ?_assertEqual({add_inlink, ?D, ?A}, LastMutation)].
+
+add_inlink_from_neuron_feedforward_error_test_(_) ->
+	change_connection_architecture(feedforward),
+
+	% Try to connect to neuron a, there should be no neurons available.
+	meck:sequence(random, uniform, 1, [1]),
+
+	?_assertError({badmatch, _}, in_transaction(fun() -> genome_mutator:add_inlink(?AGENT) end)).
 
 add_inlink_from_sensor_test_(_) ->
 	% First we select neuron d with index 4. We then connect it to the  first index of the list
@@ -257,9 +277,9 @@ add_neuron_test_(_) ->
 	% select the layer where the new neuron will be added. We select the third (0.5).
 	% The second call is construct_neuron selecting an activation function, we return the first.
 	% The third call will be to select the presynaptic element from the available
-	% sensors and neurons [sensor, a, b, c, d]. We return 2 (neuron a) and the last call will select
+	% neurons [a, b, c, d]. We return 2 (neuron a) and the last call will select
 	% the postsynaptic element, for which we return 3 (neuron c).
-	meck:sequence(random, uniform, 1, [3, 1, 2, 3]),
+	meck:sequence(random, uniform, 1, [3, 1, 1, 3]),
 	% The first call to random:uniform/0 is made by generate_id to create a unique id
 	% for the newly created neuron. The other calls are for pre- and postsynaptic weights.
 	meck:sequence(random, uniform, 0, [0.6, 0.6]),
@@ -282,6 +302,26 @@ add_neuron_test_(_) ->
 	 ?_assert(lists:member(NewNeuronId, NeuronsInLayer)),
 	 ?_assert(lists:member(NewNeuronId, Cortex#cortex.neuron_ids)),
 	 ?_assertEqual({add_neuron, ?A, NewNeuronId, ?C}, LastMutation)].
+
+add_neuron_no_outlink_available_error_test_(_) ->
+	change_connection_architecture(feedforward),
+
+	% The sequence of calls to random:uniform is as follows, the first call is to
+	% select the layer where the new neuron will be added. We select the third (0.5).
+	% The second call is construct_neuron selecting an activation function, we return the first.
+	meck:sequence(random, uniform, 1, [3, 1]),
+
+	?_assertError({badmatch, _}, in_transaction(fun() -> (genome_mutator:add_neuron(fun now/0))(?AGENT) end)).
+
+add_neuron_no_inlink_available_error_test_(_) ->
+	change_connection_architecture(feedforward),
+
+	% The sequence of calls to random:uniform is as follows, the first call is to
+	% select the layer where the new neuron will be added. We select the third (0.5).
+	% The second call is construct_neuron selecting an activation function, we return the first.
+	meck:sequence(random, uniform, 1, [1, 1]),
+
+	?_assertError({badmatch, _}, in_transaction(fun() -> (genome_mutator:add_neuron(fun now/0))(?AGENT) end)).
 
 outsplice_test_(_) ->
 	NewNeuronId = {{0.25, 80.0}, neuron},
@@ -512,6 +552,15 @@ find_node(NodeType, NodeId) ->
 in_transaction(Action) ->
 	{atomic, _} = mnesia:sync_transaction(Action).
 
+change_connection_architecture(Architecture) ->
+	% We change the connection architecture to feed forward
+	Agent = genotype:dirty_read({agent, ?AGENT}),
+	genotype:write(Agent#agent{
+		constraint = #constraint{
+			connection_architecture = Architecture
+		}
+	}).
+
 %%      A  
 %%    /   \
 %%  s       C  - D -  a
@@ -534,7 +583,11 @@ create_test_genotype() ->
 					{private,test_sim},
 					1,
 					[?D]}]},
-			 constraint = #constraint{morphology = test_morph, neural_afs = [tanh,cos,gauss,abs]},
+			 constraint = #constraint{
+				morphology = test_morph, 
+				connection_architecture = recurrent,
+				neural_afs = [tanh,cos,gauss,abs]
+			 },
 		     evo_hist = [],
 			 fitness = undefined,
 			 innovation_factor = undefined,

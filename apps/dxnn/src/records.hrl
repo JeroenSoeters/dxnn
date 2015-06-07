@@ -5,4 +5,8 @@
 -record(agent, {id, generation, population_id, species_id, cortex_id, fingerprint, constraint, evo_hist=[], fitness, innovation_factor=0, pattern=[]}).
 -record(species, {id, population_id, fingerprint, constraint, agent_ids=[], champion_ids=[], fitness, innovation_factor=0}).
 -record(population, {id, polis_id, species_ids=[], morphologies=[], innovation_factor}).
--record(constraint, {morphology=xor_mimic, neural_afs=[tanh, cos, gaussian, absolute]}).
+-record(constraint, {
+	morphology=xor_mimic, 
+	connection_architecture=recurrent, % recurrent|feed_forward
+	neural_afs=[tanh, cos, gaussian, absolute]
+}).

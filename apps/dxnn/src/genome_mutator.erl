@@ -174,7 +174,8 @@ add_outlink(AgentId) ->
 	Cortex = genotype:read({cortex, CortexId}),
 	Neuron = select_random_neuron(Agent),
 	OutputIds = Neuron#neuron.output_ids,
-	case (Cortex#cortex.neuron_ids ++ Cortex#cortex.actuator_ids) -- OutputIds of
+	OutlinkIdPool = filter_outlink_id_pool(Agent#agent.constraint, Neuron#neuron.id, Cortex#cortex.neuron_ids),
+	case (OutlinkIdPool ++ Cortex#cortex.actuator_ids) -- OutputIds of
 		[] ->
 			exit("******** ERROR: add_outlink cannot add outlink to neuron as it is already connected to all other elements");
 		ElementIds ->
@@ -192,7 +193,8 @@ add_inlink(AgentId) ->
 	Cortex = genotype:read({cortex, CortexId}),
 	Neuron = select_random_neuron(Agent),
 	InputIds = [Id || {Id, _Weights} <- Neuron#neuron.input_ids_plus_weights],
-	case (Cortex#cortex.sensor_ids ++ Cortex#cortex.neuron_ids) -- InputIds of 
+	InlinkIdPool = filter_inlink_id_pool(Agent#agent.constraint, Neuron#neuron.id, Cortex#cortex.neuron_ids),
+	case (Cortex#cortex.sensor_ids ++ InlinkIdPool) -- InputIds of 
 		[] ->
 			exit("******** ERROR: add_inlink cannot add inlink to neuron as it is already connected to all other elements");
 		ElementIds ->
@@ -258,17 +260,22 @@ add_neuron(TimeProvider) ->
 			{TargetLayerIndex, [NewNeuronId|TargetLayerNeuronIds]}),
 		SpeciesConstraint = Agent#agent.constraint,
 		genotype:construct_neuron(CortexId, Generation, SpeciesConstraint, NewNeuronId, [], []),
-		AvailableFromElements = SensorIds ++ NeuronIds,
-		AvailableToElements = NeuronIds ++ ActuatorIds,
-		FromElement = lists:nth(random:uniform(length(AvailableFromElements)), AvailableFromElements),
-		ToElement = lists:nth(random:uniform(length(AvailableToElements)), AvailableToElements),
-		create_link_between_elements(AgentId, FromElement, NewNeuronId),
-		create_link_between_elements(AgentId, NewNeuronId, ToElement),
-		genotype:write(Cortex#cortex{ neuron_ids = [NewNeuronId|NeuronIds] }),
-		genotype:write(Agent#agent{
-			pattern = UpdatedPattern,
-			evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
-		})
+		AvailableToElements = filter_outlink_id_pool(SpeciesConstraint, NewNeuronId, NeuronIds),
+		AvailableFromElements = filter_inlink_id_pool(SpeciesConstraint, NewNeuronId, NeuronIds),
+		case (AvailableFromElements == []) or (AvailableToElements == []) of
+			true ->
+				exit("******** ERROR: add_neuron cannot add neuron as there are either no inlinks or no outlinks available");
+			false ->
+				FromElement = lists:nth(random:uniform(length(AvailableFromElements)), AvailableFromElements),
+				ToElement = lists:nth(random:uniform(length(AvailableToElements)), AvailableToElements),
+				create_link_between_elements(AgentId, FromElement, NewNeuronId),
+				create_link_between_elements(AgentId, NewNeuronId, ToElement),
+				genotype:write(Cortex#cortex{ neuron_ids = [NewNeuronId|NeuronIds] }),
+				genotype:write(Agent#agent{
+					pattern = UpdatedPattern,
+					evo_hist = [{add_neuron, FromElement, NewNeuronId, ToElement}|Agent#agent.evo_hist]
+				})
+		end
 	end.
 
 outsplice(TimeProvider) ->
@@ -621,6 +628,22 @@ cut_link_to_actuator(Actuator, NeuronId) ->
 			exit("******** ERROR: cut_link_to_actuator cannot remove from fanin as it is not connected")
 	end.
 %% cut_link_from_sensor, cut_link_from_neuron, cut_link_to_neuron, cut_link_to_actuator
+
+filter_outlink_id_pool(Constraint, NeuronId, NeuronIds) ->
+	filter_neuron_ids(Constraint, NeuronId, NeuronIds, fun(LayerIndex, OtherLayerIndex) -> OtherLayerIndex > LayerIndex end).
+
+filter_inlink_id_pool(Constraint, NeuronId, NeuronIds) ->
+	filter_neuron_ids(Constraint, NeuronId, NeuronIds, fun(LayerIndex, OtherLayerIndex) -> OtherLayerIndex < LayerIndex end).
+
+filter_neuron_ids(Constraint, NeuronId, NeuronIds, LayerIndexFilter) ->
+	case Constraint#constraint.connection_architecture of
+		recurrent ->
+			NeuronIds;
+		feedforward ->
+			{{LayerIndex,_}, neuron} = NeuronId,
+			[{{OutlinkLayerIndex, OutlinkId}, neuron} || {{OutlinkLayerIndex, OutlinkId}, neuron} <- NeuronIds,
+				LayerIndexFilter(LayerIndex, OutlinkLayerIndex)]
+	end. 
 
 get_generation(AgentId) ->
 	Agent = genotype:read({agent, AgentId}),
